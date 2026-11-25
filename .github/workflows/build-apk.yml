@@ -106,6 +106,7 @@ jobs:
         with:
           platform: android
           release-version: latest
+          track: stable
 
       - uses: actions/upload-artifact@v4
         if: steps.mode.outputs.mode != 'patch'
