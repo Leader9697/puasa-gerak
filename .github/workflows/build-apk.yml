@@ -80,6 +80,7 @@ jobs:
       - name: Connect app to Shorebird (first time only)
         if: steps.mode.outputs.mode != 'plain' && hashFiles('shorebird.yaml') == ''
         run: |
+          flutter build apk --config-only
           shorebird init --display-name "Puasa & Gerak" < /dev/null
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
