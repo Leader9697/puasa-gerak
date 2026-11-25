@@ -8,6 +8,7 @@ import 'package:wakelock_plus/wakelock_plus.dart';
 import '../data.dart';
 import '../logic.dart';
 import '../state.dart';
+import 'anim.dart';
 import 'common.dart';
 
 class PlayerScreen extends StatefulWidget {
@@ -22,6 +23,18 @@ class _PlayerScreenState extends State<PlayerScreen> {
   late final List<WStep> seq = widget.program.seq(widget.lvl);
   int i = 0, left = 0, done = 0;
   bool paused = false, finished = false;
+  final List<String> doneWork = [];
+  int cardioSec = 0;
+
+  void _record(bool partial) {
+    final st = seq[i];
+    if (st.type != 'work') return;
+    final el = st.sec - left;
+    if (!partial || el >= st.sec / 2) {
+      doneWork.add(st.ex);
+      if (ex[st.ex]!.cardio) cardioSec += el;
+    }
+  }
   Timer? _t;
   final _hi = AudioPlayer(), _lo = AudioPlayer(), _tick = AudioPlayer();
 
@@ -51,6 +64,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
       done++;
       if (left <= 3 && left > 0) _beep(_tick, 'tick.wav');
       if (left <= 0) {
+        _record(false);
         i++;
         if (i >= seq.length) {
           _finish(true);
@@ -67,10 +81,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
     if (finished) return;
     finished = true;
     _t?.cancel();
+    if (left > 0) _record(true);
     final s = AppScope.read(context);
     final min = (done / 60).round();
     if (min >= 1) {
-      s.addMove(Move(nowMs(), min, widget.program.name, widget.program.kind));
+      s.addMove(Move(nowMs(), min, widget.program.name, widget.program.kind,
+          m: setsFrom(doneWork), c: (cardioSec / 60).round()));
       toast(context, '${full ? 'Latihan selesai! ' : 'Tersimpan. '}$min menit, +${30 + (min ~/ 10) * 5} XP');
     } else {
       toast(context, 'Latihan dihentikan, belum tercatat');
@@ -106,6 +122,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final nx = i + 1 < seq.length ? seq[i + 1] : null;
     final showLoad = e.range != null && (st.type == 'work' || (rest && !st.easy));
     final col = C.progColors[widget.program.color];
+    final animId = rest && st.easy ? 'march' : st.ex;
 
     return PopScope(
       canPop: false,
@@ -127,13 +144,38 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   const Gap(14),
                   Text(rest ? (st.easy ? 'Jalan santai' : 'Berikutnya: ${e.name}') : e.name, style: display(28)),
                   Expanded(
-                    child: Center(
-                      child: FittedBox(
-                        child: Text('$left', style: display(140, color: rest ? pal.muted : col)),
-                      ),
-                    ),
+                    child: LayoutBuilder(builder: (c, cs) {
+                      final side = (cs.maxHeight * .62).clamp(90.0, 240.0).clamp(0.0, cs.maxWidth);
+                      return Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                        Container(
+                          decoration: BoxDecoration(color: tintOf(context, rest ? pal.muted : col, .10), borderRadius: BorderRadius.circular(20)),
+                          child: ExerciseAnim(
+                            key: ValueKey(animId),
+                            exId: animId,
+                            color: rest && st.easy ? pal.muted : col,
+                            playing: !paused,
+                            size: side,
+                          ),
+                        ),
+                        Flexible(
+                          child: FittedBox(
+                            child: Text('$left', style: display(110, color: rest ? pal.muted : col)),
+                          ),
+                        ),
+                      ]);
+                    }),
                   ),
-                  _cue(context, rest && !st.easy ? 'Siapkan posisi' : 'Cara', [Text(e.how, style: const TextStyle(fontSize: 15)), Muted(e.tip)]),
+                  _cue(context, rest && !st.easy ? 'Siapkan posisi' : 'Cara', [
+                    Text(e.how, style: const TextStyle(fontSize: 15)),
+                    Muted(e.tip),
+                    if (e.m.isNotEmpty) ...[
+                      const Gap(6),
+                      Wrap(spacing: 6, runSpacing: 4, children: [
+                        for (final k in (e.m.entries.toList()..sort((a, b) => b.value.compareTo(a.value))))
+                          _muscleTag(context, muscles[k.key]!, k.value >= 1, col),
+                      ]),
+                    ],
+                  ]),
                   if (showLoad) ...[
                     const Gap(10),
                     _cue(context, 'Beban ${e.perHand ? 'per tangan' : 'total'}', [
@@ -158,6 +200,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     Expanded(
                         child: Btn('Lewati', ghost: true, onTap: () {
                       setState(() {
+                        _record(true);
                         i++;
                         if (i >= seq.length) {
                           i = seq.length - 1;
@@ -176,6 +219,16 @@ class _PlayerScreenState extends State<PlayerScreen> {
       ),
     );
   }
+
+  Widget _muscleTag(BuildContext c, String name, bool primary, Color col) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        decoration: BoxDecoration(
+          color: primary ? col.withValues(alpha: .16) : null,
+          border: Border.all(color: col.withValues(alpha: primary ? 0 : .5)),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Text(primary ? name : '$name (bantu)', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Pal.of(c).ink)),
+      );
 
   Widget _cue(BuildContext c, String head, List<Widget> body) {
     final pal = Pal.of(c);

@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:puasa_gerak/data.dart';
 import 'package:puasa_gerak/logic.dart';
+import 'package:puasa_gerak/ui/anim.dart';
 
 void main() {
   test('plan simulation reaches the goal for 180 cm, 107 kg to 90 kg', () {
@@ -44,5 +45,37 @@ void main() {
     expect(levelOf(150).lv, 2);
     expect(fmt1(107), '107,0');
     expect(kcal(2140), '2.150');
+  });
+
+  test('manual strength entry counts toward muscles and steers next suggestion', () {
+    final legs = strengthSets(50, ['Kaki']);
+    expect(legs['kaki'], 20);
+    expect(legs['bokong'], 15);
+    expect(legs.containsKey('dada'), isFalse);
+
+    final d = AppData();
+    d.profile.equip = 'db';
+    // yesterday: a heavy leg day logged manually instead of the suggested cardio
+    d.moves.add(Move(nowMs() - 20 * hourMs, 50, 'Angkat beban', 'str', m: legs, c: 0));
+    final an = analyze(d);
+    expect(an.sets['kaki'], 20);
+    expect(an.fatigued('kaki'), isTrue);
+    expect(an.cardioMin, 0);
+    final r = recommendToday(d);
+    // legs are recovering, so today's suggestion must not target them
+    expect(r.focus.contains('kaki'), isFalse);
+    expect(r.rest, isFalse);
+  });
+
+  test('every exercise has an animation and program moves cite a source', () {
+    for (final p in programs) {
+      for (final st in p.seq(3)) {
+        expect(anims.containsKey(st.ex), isTrue, reason: st.ex);
+      }
+      for (final id in p.exIds) {
+        expect(ex[id], isNotNull, reason: id);
+        if (!ex[id]!.cardio && ex[id]!.m.values.any((v) => v >= 1)) expect(ex[id]!.why, isNotEmpty, reason: id);
+      }
+    }
   });
 }

@@ -6,12 +6,13 @@ import '../data.dart';
 import '../logic.dart';
 import '../state.dart';
 import '../steps.dart';
+import 'anim.dart';
 import 'common.dart';
-import 'player.dart';
+import 'preview.dart';
 
 void startProgram(BuildContext c, Program p) {
   final lvl = currentLvl(AppScope.read(c).d);
-  Navigator.of(c).push(MaterialPageRoute(builder: (_) => PlayerScreen(program: p, lvl: lvl), fullscreenDialog: true));
+  Navigator.of(c).push(MaterialPageRoute(builder: (_) => ProgramPreview(program: p, lvl: lvl)));
 }
 
 class MoveTab extends StatefulWidget {
@@ -23,6 +24,7 @@ class MoveTab extends StatefulWidget {
 
 class _MoveTabState extends State<MoveTab> {
   String actType = 'Jalan cepat';
+  final Set<String> chips = {};
   final minCtl = TextEditingController(text: '30');
 
   @override
@@ -94,6 +96,7 @@ class _MoveTabState extends State<MoveTab> {
         ]),
       ),
       const _TodayRec(),
+      const _MuscleCard(),
       _StepsCard(openSettings: widget.openSettings),
       if (hasPlan(p)) const _Schedule(),
       const Padding(
@@ -104,7 +107,7 @@ class _MoveTabState extends State<MoveTab> {
       Box(
         child: Col([
           const H3('Catat aktivitas lain'),
-          const Muted('Jalan kaki, bersepeda, renang, naik tangga. Jalan cepat (masih bisa bicara, tapi napas lebih cepat) sudah termasuk intensitas sedang.'),
+          const Muted('Jalan kaki, bersepeda, renang, atau latihan beban di luar program (misal di gym). Rekomendasi berikutnya akan menyesuaikan.'),
           Row(children: [
             Expanded(
               flex: 3,
@@ -112,9 +115,7 @@ class _MoveTabState extends State<MoveTab> {
                 isExpanded: true,
                 initialValue: actType,
                 decoration: const InputDecoration(labelText: 'Aktivitas'),
-                items: const ['Jalan cepat', 'Bersepeda', 'Renang', 'Naik tangga', 'Olahraga lain']
-                    .map((e) => DropdownMenuItem(value: e, child: Text(e)))
-                    .toList(),
+                items: const [...cardioActsList, ...strengthActs].map((e) => DropdownMenuItem(value: e, child: Text(e))).toList(),
                 onChanged: (v) => setState(() => actType = v ?? actType),
               ),
             ),
@@ -123,12 +124,29 @@ class _MoveTabState extends State<MoveTab> {
                 flex: 2,
                 child: TextField(controller: minCtl, keyboardType: TextInputType.number, decoration: const InputDecoration(labelText: 'Menit'))),
           ]),
+          if (strengthActs.contains(actType)) ...[
+            const Text('Bagian otot yang dilatih', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
+            Wrap(spacing: 6, runSpacing: 6, children: [
+              for (final k in muscleChips.keys)
+                FilterChip(
+                  label: Text(k),
+                  selected: chips.contains(k),
+                  selectedColor: tintOf(context, C.blue, .3),
+                  onSelected: (v) => setState(() => v ? chips.add(k) : chips.remove(k)),
+                ),
+            ]),
+          ],
           Btn('Simpan aktivitas', onTap: () {
             final m = int.tryParse(minCtl.text.trim()) ?? 0;
             if (m < 1 || m > 300) return toast(context, 'Isi menit antara 1 dan 300');
-            s.addMove(Move(nowMs(), m, actType, 'act'));
+            final str = strengthActs.contains(actType);
+            if (str && chips.isEmpty) return toast(context, 'Pilih bagian otot yang dilatih');
+            s.addMove(str
+                ? Move(nowMs(), m, actType, 'str', m: strengthSets(m, chips), c: 0)
+                : Move(nowMs(), m, actType, 'act'));
             FocusScope.of(context).unfocus();
-            toast(context, '+$m menit tercatat. +${(m ~/ 10) * 5} XP');
+            if (str) setState(chips.clear);
+            toast(context, '+$m menit tercatat. +${str ? 30 + (m ~/ 10) * 5 : (m ~/ 10) * 5} XP');
           }),
         ]),
       ),
@@ -140,6 +158,11 @@ class _MoveTabState extends State<MoveTab> {
         'Otot tetap dijaga. Saat defisit kalori, latihan kekuatan membantu mempertahankan massa otot sehingga yang turun lebih banyak lemak.',
         'Langkah harian. Studi gabungan (Lancet Public Health 2022) menunjukkan risiko kematian turun seiring langkah harian, mendatar di sekitar 8.000–10.000 langkah untuk usia di bawah 60.',
       ], footer: 'Sumber: WHO Guidelines on Physical Activity (2020); Donnelly et al., ACSM Position Stand 2009; Wewege et al., Obes Rev 2017; Paluch et al., Lancet Public Health 2022.'),
+      Note('Kenapa gerakan ini dipilih', [
+        'Setiap gerakan dipilih karena terbukti mengaktifkan otot sasarannya dengan baik di studi EMG atau uji latihan, dan aman untuk sendi pada berat badan tinggi. Alasan per gerakan ada di "Lihat gerakan".',
+        'Volume. Sekitar 10 set per otot per minggu memberi hasil lebih baik daripada di bawah 5 set. Kartu "Otot yang dilatih" memantau angka ini.',
+        'Pemulihan. Otot yang sama butuh sekitar 48 jam sebelum dilatih berat lagi, jadi rekomendasi harian menghindari otot yang baru dilatih.',
+      ], footer: 'Jurnal:\n${programRefs.map((r) => '· $r').join('\n')}'),
     ]);
   }
 }
@@ -364,7 +387,10 @@ class _ProgramCard extends StatelessWidget {
             ),
         ]),
         Muted(pr.desc),
-        Btn('Mulai latihan', onTap: () => startProgram(context, pr)),
+        if (pr.musclesAt(1).isNotEmpty)
+          Text('Melatih: ${muscleList((pr.musclesAt(1).entries.where((e) => e.value >= 1).toList()..sort((a, b) => b.value.compareTo(a.value))).map((e) => e.key))}',
+              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        Btn('Lihat gerakan & mulai', onTap: () => startProgram(context, pr)),
         Theme(
           data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
           child: ExpansionTile(
@@ -374,15 +400,7 @@ class _ProgramCard extends StatelessWidget {
             collapsedIconColor: Colors.white,
             title: const Text('Lihat gerakan', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: Colors.white)),
             children: [
-              for (final id in ids)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 8),
-                  child: Text.rich(TextSpan(children: [
-                    TextSpan(text: ex[id]!.name, style: const TextStyle(fontWeight: FontWeight.w700)),
-                    if (ex[id]!.range != null) TextSpan(text: ' · ${fmtKg(loadOf(s.d, id))} kg', style: const TextStyle(fontWeight: FontWeight.w800)),
-                    TextSpan(text: ' · ${ex[id]!.how}', style: TextStyle(color: Colors.white.withValues(alpha: .85))),
-                  ]), style: const TextStyle(fontSize: 13.5, height: 1.4)),
-                ),
+              for (final id in ids) _ExRow(id, C.progColors[pr.color]),
             ],
           ),
         ),
@@ -413,6 +431,97 @@ class _MoveHistory extends StatelessWidget {
               ),
           ]),
       ]),
+    );
+  }
+}
+
+class _ExRow extends StatelessWidget {
+  final String id;
+  final Color col;
+  const _ExRow(this.id, this.col);
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final e = ex[id]!;
+    final prim = e.m.entries.where((x) => x.value >= 1).map((x) => x.key);
+    final sec = e.m.entries.where((x) => x.value < 1).map((x) => x.key);
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Container(
+          decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(12)),
+          child: ExerciseAnim(exId: id, color: col, size: 72),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            Text.rich(TextSpan(children: [
+              TextSpan(text: e.name, style: const TextStyle(fontWeight: FontWeight.w700)),
+              if (e.range != null) TextSpan(text: ' · ${fmtKg(loadOf(s.d, id))} kg', style: const TextStyle(fontWeight: FontWeight.w800)),
+            ]), style: const TextStyle(fontSize: 14)),
+            if (prim.isNotEmpty)
+              Text('Otot: ${muscleList(prim)}${sec.isNotEmpty ? ' (bantu: ${muscleList(sec)})' : ''}',
+                  style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600)),
+            Text(e.how, style: TextStyle(fontSize: 13, height: 1.35, color: Colors.white.withValues(alpha: .9))),
+            if (e.why.isNotEmpty)
+              Padding(
+                padding: const EdgeInsets.only(top: 3),
+                child: Text(e.why, style: TextStyle(fontSize: 12, height: 1.35, fontStyle: FontStyle.italic, color: Colors.white.withValues(alpha: .8))),
+              ),
+          ]),
+        ),
+      ]),
+    );
+  }
+}
+
+class _MuscleCard extends StatelessWidget {
+  const _MuscleCard();
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final an = analyze(s.d);
+    final pal = Pal.of(context);
+    const target = 10.0;
+    final weak = an.weakest().take(3).toList();
+    final fat = muscles.keys.where(an.fatigued).toList();
+    final cardioGoal = hasPlan(s.p) ? (planNow(s.p).exMin * .6).round() : 90;
+    return Box(
+      child: Col([
+        Row(children: [
+          const Icon(Icons.accessibility_new_rounded, color: C.blue),
+          const SizedBox(width: 8),
+          const Expanded(child: H3('Otot yang dilatih · 7 hari')),
+          Muted('target ±${target.round()} set', size: 12.5),
+        ]),
+        for (final k in muscles.keys)
+          Row(children: [
+            SizedBox(width: 104, child: Text(muscles[k]!, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+            Expanded(
+              child: Meter(((an.sets[k] ?? 0) / target).clamp(0, 1).toDouble(),
+                  color: (an.sets[k] ?? 0) >= target ? C.green : ((an.sets[k] ?? 0) >= target / 2 ? C.blue : C.orange), height: 8),
+            ),
+            SizedBox(
+              width: 58,
+              child: Text('${fmtKg(((an.sets[k] ?? 0) * 2).round() / 2)} set${an.fatigued(k) ? ' •' : ''}',
+                  textAlign: TextAlign.right, style: TextStyle(fontSize: 12.5, color: pal.muted)),
+            ),
+          ]),
+        Row(children: [
+          SizedBox(width: 104, child: Text('Kardio', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: C.pink))),
+          Expanded(child: Meter((an.cardioMin / math.max(1, cardioGoal)).clamp(0, 1).toDouble(), color: C.pink, height: 8)),
+          SizedBox(width: 58, child: Text('${an.cardioMin} mnt', textAlign: TextAlign.right, style: TextStyle(fontSize: 12.5, color: pal.muted))),
+        ]),
+        Muted(
+          [
+            if (an.totalMin == 0) 'Belum ada latihan 7 hari terakhir. Mulai dari rekomendasi di atas.'
+            else if (weak.isNotEmpty) 'Paling kurang: ${muscleList(weak)}. Rekomendasi berikutnya akan mengutamakan otot ini.'
+            else 'Semua otot sudah sekitar 10 set minggu ini. Bagus, pertahankan.',
+            if (fat.isNotEmpty) '• = baru dilatih (< 48 jam), sebaiknya diistirahatkan dulu.',
+          ].join(' '),
+          size: 12.5,
+        ),
+      ], gap: 8),
     );
   }
 }

@@ -103,11 +103,15 @@ class Weight {
 class Move {
   int t, min;
   String name, kind; // kind: act | str | prog
-  Move(this.t, this.min, this.name, this.kind);
-  Map<String, dynamic> toJson() => {'t': t, 'min': min, 'name': name, 'kind': kind};
+  /// Sets per muscle group (see `muscles` in logic.dart). Empty = derive from name.
+  Map<String, double> m;
+  /// Minutes of cardio work in this session (null = derive).
+  int? c;
+  Move(this.t, this.min, this.name, this.kind, {Map<String, double>? m, this.c}) : m = m ?? {};
+  Map<String, dynamic> toJson() => {'t': t, 'min': min, 'name': name, 'kind': kind, if (m.isNotEmpty) 'm': m, if (c != null) 'c': c};
 }
 
-const exKeys = ['goblet', 'floorpress', 'row1', 'rdl', 'carry', 'sumo', 'ohp', 'row2', 'dbbridge', 'curl'];
+const exKeys = ['goblet', 'floorpress', 'row1', 'rdl', 'carry', 'sumo', 'ohp', 'row2', 'dbbridge', 'curl', 'splitsquat'];
 
 class AppData {
   int updatedAt = 0;
@@ -159,8 +163,16 @@ class AppData {
       b.moves = (o['moves'] as List).whereType<Map>().where((m) => m['t'] is num).map((m) {
         final k = m['kind'] == 'str' ? 'str' : (m['kind'] == 'prog' ? 'prog' : 'act');
         final name = (m['name'] ?? 'Olahraga').toString();
+        final mm = <String, double>{};
+        if (m['m'] is Map) {
+          (m['m'] as Map).forEach((key, v) {
+            final x = _n(v, 0);
+            if (key is String && x > 0 && x < 100) mm[key] = x;
+          });
+        }
         return Move((m['t'] as num).round(), math.max(1, _n(m['min'], 1).round()),
-            name.length > 60 ? name.substring(0, 60) : name, k);
+            name.length > 60 ? name.substring(0, 60) : name, k,
+            m: mm, c: m['c'] is num ? (m['c'] as num).round() : null);
       }).toList();
       b.moves.sort((x, y) => x.t.compareTo(y.t));
     }

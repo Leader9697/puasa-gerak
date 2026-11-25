@@ -151,37 +151,123 @@ String bmiCat(double b) {
 }
 
 // ---------- workouts ----------
+/// Muscle groups used for the weekly analysis.
+const muscles = <String, String>{
+  'kaki': 'Paha depan',
+  'bokong': 'Bokong',
+  'pahaBlk': 'Paha belakang',
+  'dada': 'Dada',
+  'punggung': 'Punggung',
+  'bahu': 'Bahu',
+  'lengan': 'Lengan',
+  'inti': 'Perut & inti',
+  'betis': 'Betis',
+};
+
+/// Groups a manual strength entry can be tagged with, and how much one set
+/// for that group counts toward each muscle (compound lifts hit several).
+const muscleChips = <String, Map<String, double>>{
+  'Kaki': {'kaki': 1, 'bokong': .75, 'pahaBlk': .5},
+  'Dada': {'dada': 1, 'bahu': .5, 'lengan': .5},
+  'Punggung': {'punggung': 1, 'lengan': .5, 'pahaBlk': .25},
+  'Bahu': {'bahu': 1, 'lengan': .5},
+  'Lengan': {'lengan': 1},
+  'Perut': {'inti': 1},
+  'Seluruh tubuh': {'kaki': .4, 'bokong': .4, 'pahaBlk': .3, 'dada': .3, 'punggung': .3, 'bahu': .3, 'lengan': .2, 'inti': .3},
+};
+
+const strengthActs = ['Angkat beban', 'Latihan beban tubuh'];
+const cardioActsList = ['Jalan cepat', 'Bersepeda', 'Renang', 'Naik tangga', 'Olahraga lain'];
+
+/// Sets per muscle for a manual strength session: about one working set
+/// (with rest) every 2.5 minutes, split evenly over the chosen groups.
+Map<String, double> strengthSets(int min, Iterable<String> chips) {
+  final out = <String, double>{};
+  final list = chips.where(muscleChips.containsKey).toList();
+  if (list.isEmpty) return out;
+  final per = min / 2.5 / list.length;
+  for (final c in list) {
+    // a full-body session is ~5 movement patterns, each a share of the sets
+    final f = c == 'Seluruh tubuh' ? per * 2 : per;
+    muscleChips[c]!.forEach((k, w) => out[k] = (out[k] ?? 0) + f * w);
+  }
+  return out.map((k, v) => MapEntry(k, (v * 2).round() / 2)).map((k, v) => MapEntry(k, v.clamp(0, 40).toDouble()))
+    ..removeWhere((k, v) => v <= 0);
+}
+
 class Ex {
   final String name, how, tip;
   final List<int>? range; // suggested dumbbell load kg
   final bool perHand;
-  const Ex(this.name, this.how, this.tip, [this.range, this.perHand = false]);
+  final Map<String, double> m; // muscle -> 1 primary, 0.5 secondary
+  final bool cardio;
+  final String why; // why this movement, with source
+  const Ex(this.name, this.how, this.tip,
+      {this.range, this.perHand = false, this.m = const {}, this.cardio = false, this.why = ''});
 }
 
 const ex = <String, Ex>{
-  'march': Ex('Jalan di tempat', 'Angkat lutut senyamannya, ayunkan tangan. Napas tetap teratur.', 'Mudah: pelan. Berat: lutut lebih tinggi.'),
-  'wallpush': Ex('Push-up dinding', 'Tangan di dinding selebar bahu, badan lurus, tekuk siku lalu dorong.', 'Berat: tangan di meja atau sandaran sofa yang kokoh.'),
-  'sitstand': Ex('Duduk-berdiri dari kursi', 'Duduk di ujung kursi, berdiri tanpa bantuan tangan, duduk lagi pelan.', 'Mudah: pakai tangan. Berat: turun 3 hitungan.'),
-  'sidestep': Ex('Langkah ke samping', 'Langkah kanan-kiri bergantian, tekuk lutut sedikit, ayun tangan.', 'Berat: tambah tepuk tangan di atas kepala.'),
-  'bridge': Ex('Glute bridge', 'Berbaring, lutut ditekuk, angkat pinggul sampai lurus bahu-lutut, tahan 1 detik.', 'Kalau susah turun ke lantai: lakukan di kasur.'),
-  'row': Ex('Tarik ransel', 'Isi ransel dengan botol air, badan condong dengan punggung lurus, tarik ransel ke perut.', 'Bisa satu tangan bergantian, tangan lain bertumpu di meja.'),
-  'birddog': Ex('Bird dog', 'Posisi merangkak, julurkan tangan kanan dan kaki kiri, tahan 2 detik, ganti.', 'Mudah: hanya tangan atau hanya kaki.'),
-  'knee': Ex('Angkat lutut berdiri', 'Berdiri tegak, angkat lutut ke arah siku berlawanan bergantian.', 'Pegang kursi kalau perlu keseimbangan.'),
-  'stepjack': Ex('WStep jack (tanpa lompat)', 'Langkah satu kaki ke samping sambil angkat kedua tangan, kembali, ganti kaki.', 'Cepatkan tempo saat interval cepat.'),
-  'box': Ex('Tinju udara', 'Kuda-kuda sedikit tekuk, pukul lurus bergantian dengan cepat, perut kencang.', 'Tambah langkah maju-mundur.'),
-  'squatpulse': Ex('Squat ke kursi', 'Duduk hampir menyentuh kursi lalu berdiri cepat.', 'Mudah: duduk penuh dulu.'),
-  'calf': Ex('Jinjit', 'Berdiri pegang sandaran kursi, naik jinjit, turun pelan.', 'Berat: satu kaki.'),
+  'march': Ex('Jalan di tempat', 'Angkat lutut senyamannya, ayunkan tangan. Napas tetap teratur.', 'Mudah: pelan. Berat: lutut lebih tinggi.', cardio: true),
+  'wallpush': Ex('Push-up dinding', 'Tangan di dinding selebar bahu, badan lurus, tekuk siku lalu dorong.', 'Berat: tangan di meja atau sandaran sofa yang kokoh.',
+      m: {'dada': 1, 'lengan': .5, 'bahu': .5},
+      why: 'Push-up melatih otot dada sama efektifnya dengan bench press pada beban sebanding (Calatayud dkk., J Strength Cond Res 2015). Versi dinding mengurangi beban untuk pemula.'),
+  'sitstand': Ex('Duduk-berdiri dari kursi', 'Duduk di ujung kursi, berdiri tanpa bantuan tangan, duduk lagi pelan.', 'Mudah: pakai tangan. Berat: turun 3 hitungan.',
+      m: {'kaki': 1, 'bokong': 1},
+      why: 'Gerakan fungsional dasar squat. Kursi membatasi kedalaman sehingga aman untuk lutut saat berat badan masih tinggi.'),
+  'sidestep': Ex('Langkah ke samping', 'Langkah kanan-kiri bergantian, tekuk lutut sedikit, ayun tangan.', 'Berat: tambah tepuk tangan di atas kepala.', cardio: true),
+  'bridge': Ex('Glute bridge', 'Berbaring, lutut ditekuk, angkat pinggul sampai lurus bahu-lutut, tahan 1 detik.', 'Kalau susah turun ke lantai: lakukan di kasur.',
+      m: {'bokong': 1, 'pahaBlk': .5},
+      why: 'Gerakan dorong pinggul memberi aktivasi otot bokong lebih tinggi daripada squat (Contreras dkk., J Appl Biomech 2015).'),
+  'row': Ex('Tarik ransel', 'Isi ransel dengan botol air, badan condong dengan punggung lurus, tarik ransel ke perut.', 'Bisa satu tangan bergantian, tangan lain bertumpu di meja.',
+      m: {'punggung': 1, 'lengan': .5}, why: 'Gerakan tarik menyeimbangkan gerakan dorong dan melatih punggung atas (Fenwick dkk., J Strength Cond Res 2009).'),
+  'birddog': Ex('Bird dog', 'Posisi merangkak, julurkan tangan kanan dan kaki kiri, tahan 2 detik, ganti.', 'Mudah: hanya tangan atau hanya kaki.',
+      m: {'inti': 1, 'bokong': .5},
+      why: 'Salah satu "big three" McGill untuk stabilitas tulang belakang dengan beban rendah pada punggung bawah (Ekstrom dkk., JOSPT 2007; McGill, Low Back Disorders).'),
+  'knee': Ex('Angkat lutut berdiri', 'Berdiri tegak, angkat lutut ke arah siku berlawanan bergantian.', 'Pegang kursi kalau perlu keseimbangan.', cardio: true, m: {'inti': .5}),
+  'stepjack': Ex('Step jack (tanpa lompat)', 'Langkah satu kaki ke samping sambil angkat kedua tangan, kembali, ganti kaki.', 'Cepatkan tempo saat interval cepat.', cardio: true),
+  'box': Ex('Tinju udara', 'Kuda-kuda sedikit tekuk, pukul lurus bergantian dengan cepat, perut kencang.', 'Tambah langkah maju-mundur.', cardio: true),
+  'squatpulse': Ex('Squat ke kursi', 'Duduk hampir menyentuh kursi lalu berdiri cepat.', 'Mudah: duduk penuh dulu.', cardio: true, m: {'kaki': .5}),
+  'calf': Ex('Jinjit', 'Berdiri pegang sandaran kursi, naik jinjit, turun pelan.', 'Berat: satu kaki.', m: {'betis': 1},
+      why: 'Jinjit adalah latihan dasar untuk betis (gastroknemius dan soleus). ACSM menyarankan semua kelompok otot besar dilatih 2–3 kali seminggu (ACSM 2009).'),
   'stretch': Ex('Peregangan', 'Tarik napas dalam, regangkan paha depan, paha belakang, dan bahu.', 'Tidak perlu memantul.'),
-  'goblet': Ex('Goblet squat ke kursi', 'Pegang 1 dumbbell tegak di depan dada. Turun sampai pantat menyentuh kursi, lalu berdiri. Dada tegak, lutut searah jari kaki.', 'Target 10–12 repetisi pelan.', [8, 14]),
-  'floorpress': Ex('Floor press', 'Berbaring (lantai atau kasur), dumbbell di tiap tangan. Dorong ke atas sampai lengan lurus, turunkan sampai siku menyentuh lantai.', 'Lebih ramah bahu daripada bench press.', [6, 12], true),
-  'row1': Ex('Row satu tangan', 'Satu tangan dan lutut bertumpu di kursi, punggung datar. Tarik dumbbell ke pinggang, turunkan pelan. Ganti sisi di tengah waktu.', 'Bahu jauhi telinga.', [8, 14], true),
-  'rdl': Ex('Romanian deadlift', 'Dumbbell di depan paha, lutut sedikit tekuk. Dorong pinggul ke belakang sampai paha belakang terasa tertarik, lalu berdiri.', 'Punggung tetap lurus. Jangan membungkuk melengkung.', [8, 14]),
-  'carry': Ex('Farmer march', 'Pegang dumbbell di kedua sisi, berdiri tegak, jalan di tempat pelan. Perut kencang.', 'Bagus untuk genggaman dan otot inti.', [10, 20], true),
-  'sumo': Ex('Sumo squat', 'Kaki lebar, jari kaki sedikit keluar, pegang 1 dumbbell menggantung di tengah. Turun selagi nyaman, berdiri.', 'Boleh pakai kursi di belakang sebagai patokan.', [8, 16]),
-  'ohp': Ex('Overhead press duduk', 'Duduk tegak di kursi, dumbbell setinggi bahu. Dorong ke atas, turunkan pelan.', 'Jangan melengkungkan punggung bawah.', [4, 10], true),
-  'row2': Ex('Bent-over row', 'Badan condong 45°, punggung lurus, tarik kedua dumbbell ke perut.', 'Kalau punggung bawah pegal, pakai row satu tangan.', [6, 12], true),
-  'dbbridge': Ex('Glute bridge dumbbell', 'Berbaring, dumbbell di atas pinggul (pegang). Angkat pinggul, tahan 1 detik di atas.', 'Ganjal dumbbell dengan handuk agar nyaman.', [8, 20]),
-  'curl': Ex('Bicep curl', 'Berdiri, siku menempel badan, angkat dumbbell ke bahu lalu turunkan pelan.', 'Jangan mengayun badan.', [4, 10], true),
+  'goblet': Ex('Goblet squat ke kursi', 'Pegang 1 dumbbell tegak di depan dada. Turun sampai pantat menyentuh kursi, lalu berdiri. Dada tegak, lutut searah jari kaki.', 'Target 10–12 repetisi pelan.',
+      range: [8, 14], m: {'kaki': 1, 'bokong': 1, 'inti': .5},
+      why: 'Squat adalah gerakan inti untuk kekuatan kaki (ACSM Position Stand, Med Sci Sports Exerc 2009). Beban di depan dada menjaga badan tegak dan ramah punggung.'),
+  'floorpress': Ex('Floor press', 'Berbaring (lantai atau kasur), dumbbell di tiap tangan. Dorong ke atas sampai lengan lurus, turunkan sampai siku menyentuh lantai.', 'Lebih ramah bahu daripada bench press.',
+      range: [6, 12], perHand: true, m: {'dada': 1, 'lengan': .5, 'bahu': .5},
+      why: 'Gerakan dorong horizontal untuk dada dan trisep. Lantai membatasi gerak sehingga bahu lebih aman tanpa bangku.'),
+  'row1': Ex('Row satu tangan', 'Satu tangan dan lutut bertumpu di kursi, punggung datar. Tarik dumbbell ke pinggang, turunkan pelan. Ganti sisi di tengah waktu.', 'Bahu jauhi telinga.',
+      range: [8, 14], perHand: true, m: {'punggung': 1, 'lengan': .5},
+      why: 'Row bertumpu melatih punggung dengan beban rendah pada punggung bawah dibanding row membungkuk (Fenwick dkk., J Strength Cond Res 2009).'),
+  'rdl': Ex('Romanian deadlift', 'Dumbbell di depan paha, lutut sedikit tekuk. Dorong pinggul ke belakang sampai paha belakang terasa tertarik, lalu berdiri.', 'Punggung tetap lurus. Jangan membungkuk melengkung.',
+      range: [8, 14], m: {'pahaBlk': 1, 'bokong': 1, 'punggung': .5},
+      why: 'RDL termasuk gerakan dengan aktivasi paha belakang tertinggi (McAllister dkk., J Strength Cond Res 2014).'),
+  'carry': Ex('Farmer march', 'Pegang dumbbell di kedua sisi, berdiri tegak, jalan di tempat pelan. Perut kencang.', 'Bagus untuk genggaman dan otot inti.',
+      range: [10, 20], perHand: true, m: {'inti': 1, 'lengan': .5, 'punggung': .5},
+      why: 'Membawa beban melatih otot inti dan genggaman secara bersamaan (McGill dkk., J Strength Cond Res 2009).'),
+  'sumo': Ex('Sumo squat', 'Kaki lebar, jari kaki sedikit keluar, pegang 1 dumbbell menggantung di tengah. Turun selagi nyaman, berdiri.', 'Boleh pakai kursi di belakang sebagai patokan.',
+      range: [8, 16], m: {'kaki': 1, 'bokong': 1},
+      why: 'Posisi kaki lebar menambah kerja bokong dan paha dalam dibanding squat kaki sempit, dengan kerja paha depan yang sama (Paoli dkk., J Strength Cond Res 2009).'),
+  'ohp': Ex('Overhead press duduk', 'Duduk tegak di kursi, dumbbell setinggi bahu. Dorong ke atas, turunkan pelan.', 'Jangan melengkungkan punggung bawah.',
+      range: [4, 10], perHand: true, m: {'bahu': 1, 'lengan': .5},
+      why: 'Press dumbbell melatih otot bahu dengan baik; versi duduk lebih stabil untuk pemula (Saeterbakken & Fimland, J Strength Cond Res 2013).'),
+  'row2': Ex('Bent-over row', 'Badan condong 45°, punggung lurus, tarik kedua dumbbell ke perut.', 'Kalau punggung bawah pegal, pakai row satu tangan.',
+      range: [6, 12], perHand: true, m: {'punggung': 1, 'lengan': .5, 'pahaBlk': .5},
+      why: 'Row membungkuk melatih punggung atas dan otot penahan punggung sekaligus (Fenwick dkk., J Strength Cond Res 2009).'),
+  'dbbridge': Ex('Glute bridge dumbbell', 'Berbaring, dumbbell di atas pinggul (pegang). Angkat pinggul, tahan 1 detik di atas.', 'Ganjal dumbbell dengan handuk agar nyaman.',
+      range: [8, 20], m: {'bokong': 1, 'pahaBlk': .5},
+      why: 'Dorong pinggul berbeban memberi aktivasi bokong tertinggi di antara gerakan kaki (Contreras dkk., J Appl Biomech 2015).'),
+  'curl': Ex('Bicep curl', 'Berdiri, siku menempel badan, angkat dumbbell ke bahu lalu turunkan pelan.', 'Jangan mengayun badan.', range: [4, 10], perHand: true, m: {'lengan': 1},
+      why: 'Curl dumbbell berdiri memberi aktivasi biseps yang tinggi dan mudah diatur bebannya (Oliveira dkk., J Sports Sci Med 2009).'),
+  'splitsquat': Ex('Split squat (pegang kursi)', 'Satu kaki di depan, satu di belakang. Turunkan lutut belakang mendekati lantai, lalu naik. Pegang dumbbell di sisi atau satu tangan di kursi. Ganti kaki di tengah waktu.', 'Mudah: tanpa dumbbell, tangan di kursi.',
+      range: [4, 10], perHand: true, m: {'kaki': 1, 'bokong': 1},
+      why: 'Latihan satu kaki memberi peningkatan kekuatan setara squat dua kaki dengan beban punggung lebih ringan (Speirs dkk., J Strength Cond Res 2016).'),
+  'incline': Ex('Push-up miring (meja)', 'Tangan di tepi meja yang kokoh, badan lurus dari kepala ke tumit. Turunkan dada ke meja, lalu dorong.', 'Berat: makin rendah pegangan, makin berat.',
+      m: {'dada': 1, 'lengan': .5, 'bahu': .5},
+      why: 'Push-up memberi hasil kekuatan setara bench press (Calatayud dkk., J Strength Cond Res 2015). Sudut miring menyesuaikan beban.'),
+  'deadbug': Ex('Dead bug', 'Berbaring, lengan lurus ke atas, lutut 90°. Julurkan tangan kanan ke belakang kepala dan kaki kiri lurus, punggung bawah tetap menempel lantai. Ganti sisi.', 'Mudah: gerakkan kaki saja.',
+      m: {'inti': 1},
+      why: 'Melatih otot perut dalam sambil menjaga punggung bawah netral, aman untuk pemula (Ekstrom dkk., JOSPT 2007).'),
 };
 
 class WStep {
@@ -241,20 +327,42 @@ class Program {
   int minutesAt(int l) => (seq(l).fold<int>(0, (a, s) => a + s.sec) / 60).round();
   int get minutes => minutesAt(1);
   List<String> get exIds => seq().where((s) => s.type == 'work').map((s) => s.ex).toSet().toList();
+
+  /// Sets per muscle group for a full session at level [l].
+  Map<String, double> musclesAt(int l) => setsFrom(seq(l).where((s) => s.type == 'work').map((s) => s.ex));
+  int cardioMinAt(int l) => (seq(l).where((s) => s.type == 'work' && ex[s.ex]!.cardio).fold<int>(0, (a, s) => a + s.sec) / 60).round();
 }
 
+Map<String, double> setsFrom(Iterable<String> workExIds) {
+  final out = <String, double>{};
+  for (final id in workExIds) {
+    ex[id]!.m.forEach((k, v) => out[k] = (out[k] ?? 0) + v);
+  }
+  return out;
+}
+
+// Full-body sessions built from compound movements (ACSM 2009: multi-joint
+// exercises, 8-12 reps, 2-3 days/week for novices).
 List<WStep> _p1([int lvl = 1]) => _circuit(['wallpush', 'sitstand', 'sidestep', 'calf', 'knee'], 30, 30, 2, 120);
 List<WStep> _p2([int lvl = 1]) => _circuit(['sitstand', 'wallpush', 'bridge', 'row', 'birddog', 'calf'], 40, 20, lvl >= 3 ? 4 : 3, 150);
 List<WStep> _d1([int lvl = 1]) => _sets(['goblet', 'floorpress', 'row1', 'rdl', 'carry'], lvl >= 3 ? 4 : 3, 40, lvl >= 2 ? 35 : 40, 150);
-List<WStep> _d2([int lvl = 1]) => _sets(['sumo', 'ohp', 'row2', 'dbbridge', 'curl'], lvl >= 3 ? 4 : 3, 40, lvl >= 2 ? 35 : 40, 150);
+List<WStep> _d2([int lvl = 1]) => _sets(['splitsquat', 'incline', 'row2', 'ohp', 'dbbridge', 'deadbug'], lvl >= 3 ? 4 : 3, 40, lvl >= 2 ? 35 : 40, 150);
 
 // color: 0 green, 1 blue, 2 purple, 3 pink, 4 red
 const programs = [
   Program('p1', 'Mulai Ringan', 'Pemula', 'str', 'Untuk minggu-minggu pertama. Semua gerakan berdiri atau bertumpu, aman untuk lutut.', 0, _p1),
-  Program('p2', 'Kekuatan Dasar', 'Latihan otot', 'str', 'Latih otot besar seluruh tubuh. Lakukan 2–3 kali seminggu, selang sehari.', 1, _p2),
-  Program('d1', 'Dumbbell A · Seluruh Tubuh', 'Dumbbell', 'str', '5 gerakan, 3 set × 40 detik (sekitar 10–12 repetisi), istirahat 40 detik. Fokus kaki, dada, punggung.', 2, _d1, db: true),
-  Program('d2', 'Dumbbell B · Seluruh Tubuh', 'Dumbbell', 'str', 'Variasi dari A agar semua otot kena. Selang-seling A dan B, minimal 1 hari jeda.', 3, _d2, db: true),
-  Program('p3', 'Kardio Interval Tanpa Lompat', 'Kardio', 'prog', '30 detik cepat, 30 detik santai, 8 kali. Detak jantung naik tanpa membebani sendi.', 4, _intervals),
+  Program('p2', 'Kekuatan Dasar', 'Latihan otot', 'str', 'Latih otot besar seluruh tubuh tanpa alat. Lakukan 2–3 kali seminggu, selang sehari.', 1, _p2),
+  Program('d1', 'Dumbbell A · Seluruh Tubuh', 'Dumbbell', 'str', 'Squat, dorong, tarik, hinge, dan bawa beban: lima pola gerak dasar. 3 set × 40 detik (sekitar 10–12 repetisi).', 2, _d1, db: true),
+  Program('d2', 'Dumbbell B · Seluruh Tubuh', 'Dumbbell', 'str', 'Pasangan A: satu kaki, dorong miring, tarik, tekan ke atas, pinggul, dan perut. Selang-seling A dan B, minimal 1 hari jeda.', 3, _d2, db: true),
+  Program('p3', 'Kardio Interval Tanpa Lompat', 'Kardio', 'prog', '30 detik cepat, 30 detik santai. Detak jantung naik tanpa membebani sendi.', 4, _intervals),
+];
+
+const programRefs = [
+  'ACSM Position Stand: Progression models in resistance training for healthy adults. Med Sci Sports Exerc 2009.',
+  'Schoenfeld BJ, Ogborn D, Krieger JW. Dose-response relationship between weekly resistance training volume and increases in muscle mass. J Sports Sci 2017. (Sekitar 10 set per otot per minggu memberi hasil lebih baik.)',
+  'Cava E, Yeat NC, Mittendorfer B. Preserving healthy muscle during weight loss. Adv Nutr 2017. (Latihan beban menjaga otot saat defisit kalori.)',
+  'Wewege M dkk. HIIT vs latihan kontinu untuk komposisi tubuh pada orang dengan berat berlebih. Obes Rev 2017.',
+  'Calatayud J dkk. J Strength Cond Res 2015 · Contreras B dkk. J Appl Biomech 2015 · McAllister MJ dkk. J Strength Cond Res 2014 · Fenwick CM dkk. J Strength Cond Res 2009 · Speirs DE dkk. J Strength Cond Res 2016 · Saeterbakken AH & Fimland MS. J Strength Cond Res 2013 · Ekstrom RA dkk. JOSPT 2007 · Paoli A dkk. J Strength Cond Res 2009 · Oliveira LF dkk. J Sports Sci Med 2009.',
 ];
 
 double loadOf(AppData s, String id) => s.loads[id] ?? (ex[id]!.range?[0] ?? 0).toDouble();
@@ -490,70 +598,200 @@ class Rec {
   final String? programId; // null = walk or rest
   final int walkMin;
   final bool rest;
-  Rec(this.title, this.why, {this.programId, this.walkMin = 0, this.rest = false});
+  final List<String> focus; // muscle ids this suggestion targets
+  Rec(this.title, this.why, {this.programId, this.walkMin = 0, this.rest = false, this.focus = const []});
 }
 
-/// Today's suggestion: follows the weekly schedule but adapts to what was
-/// actually done (no strength two days in a row, catch up a missed session,
-/// lighter day after a long fast).
+// ---------- what was actually trained ----------
+final cardioActs = cardioActsList.toSet();
+
+Program? programByName(String name) {
+  for (final p in programs) {
+    if (p.name == name) return p;
+  }
+  return null;
+}
+
+/// Sets per muscle group for one logged session.
+Map<String, double> moveMuscles(Move m) {
+  if (m.m.isNotEmpty) return m.m;
+  final p = programByName(m.name);
+  if (p == null) return const {};
+  final f = math.min(1.0, m.min / math.max(1, p.minutes));
+  return p.musclesAt(1).map((k, v) => MapEntry(k, v * f));
+}
+
+/// Cardio minutes for one logged session.
+int moveCardio(Move m) {
+  if (m.c != null) return m.c!;
+  if (m.kind == 'act') return cardioActs.contains(m.name) ? m.min : 0;
+  if (m.kind == 'prog') return m.min;
+  final p = programByName(m.name);
+  return p == null ? 0 : math.min(m.min, p.cardioMinAt(1));
+}
+
+bool isStrength(Move m) => moveMuscles(m).values.fold<double>(0, (a, b) => a + b) >= 3;
+
+class Analysis {
+  final Map<String, double> sets; // last 7 days
+  final Map<String, int> lastHit; // muscle -> last time trained (ms)
+  final int cardioMin, totalMin, strDays;
+  Analysis(this.sets, this.lastHit, this.cardioMin, this.totalMin, this.strDays);
+
+  /// Muscles below [target] sets, weakest first.
+  List<String> weakest([double target = 10]) =>
+      (muscles.keys.where((k) => (sets[k] ?? 0) < target).toList()..sort((a, b) => (sets[a] ?? 0).compareTo(sets[b] ?? 0)));
+
+  bool fatigued(String k) => (lastHit[k] ?? 0) > nowMs() - 44 * hourMs;
+}
+
+Analysis analyze(AppData s, {int days = 7}) {
+  final from = nowMs() - days * dayMs;
+  final sets = <String, double>{};
+  final last = <String, int>{};
+  var cardio = 0, total = 0;
+  final strDays = <String>{};
+  for (final m in s.moves.where((m) => m.t >= from)) {
+    final mm = moveMuscles(m);
+    mm.forEach((k, v) {
+      sets[k] = (sets[k] ?? 0) + v;
+      if (v >= 1) last[k] = math.max(last[k] ?? 0, m.t);
+    });
+    if (isStrength(m)) strDays.add(ymd(fromMs(m.t)));
+    cardio += moveCardio(m);
+    total += m.min;
+  }
+  // muscles hit in the last 2 days even if older than the window
+  for (final m in s.moves.where((m) => m.t >= nowMs() - 2 * dayMs && m.t < from)) {
+    moveMuscles(m).forEach((k, v) {
+      if (v >= 1) last[k] = math.max(last[k] ?? 0, m.t);
+    });
+  }
+  return Analysis(sets, last, cardio, total, strDays.length);
+}
+
+String muscleList(Iterable<String> ids) {
+  final n = ids.map((k) => muscles[k]!.toLowerCase()).toList();
+  if (n.isEmpty) return '';
+  if (n.length == 1) return n.first;
+  return '${n.sublist(0, n.length - 1).join(', ')} dan ${n.last}';
+}
+
+/// Today's suggestion, based on what was actually done in the last days
+/// (not only the weekly calendar): strength needs ~48 h between sessions for
+/// the same muscles, ~2-3 strength days and the rest cardio per week, and the
+/// least-trained muscles get priority.
 Rec recommendToday(AppData s, {List<int> steps7 = const []}) {
   final p = s.profile;
-  final now = DateTime.now();
-  final phase = hasPlan(p) ? planNow(p).phase : _phaseFromHistory(s);
-  final types = sessionTypes(p, phase);
-  final dow = now.weekday - 1;
-  final exMin = hasPlan(p) ? planNow(p).exMin : exMinOf(_weeksActive(s), p);
+  final now = nowMs();
+  final weeks = hasPlan(p) ? weekIdx(p) : _weeksActive(s);
+  final phase = phaseOf(weeks, paceOf(p));
+  final lvl = currentLvl(s);
+  final exMin = hasPlan(p) ? planNow(p).exMin : exMinOf(weeks, p);
   final per = math.max(15, (exMin / p.days).round());
-  final today = ymd(now);
-  final yest = ymd(now.subtract(const Duration(days: 1)));
-  final doneToday = s.moves.where((m) => ymd(fromMs(m.t)) == today && m.kind != 'act').toList();
-  final strYest = s.moves.any((m) => ymd(fromMs(m.t)) == yest && m.kind == 'str');
-  final wm = weekMoves(s);
-  final strThisWeek = wm.where((m) => m.kind == 'str').map((m) => ymd(fromMs(m.t))).toSet().length;
-  final plannedStrSoFar = [for (var i = 0; i < dow; i++) types[i]].where((t) => t != null && t != 'p3' && t != 'walk').length;
-  final weekMin = wm.fold<int>(0, (a, m) => a + m.min);
-  final longFast = s.active != null && (nowMs() - s.active!.start) > 16 * hourMs;
+  final an = analyze(s);
+  final today = ymd(DateTime.now());
+  final doneToday = s.moves.where((m) => ymd(fromMs(m.t)) == today).toList();
+  final strToday = doneToday.any(isStrength);
+  final cardioToday = doneToday.fold<int>(0, (a, m) => a + moveCardio(m));
+  final recentStr = s.moves.where((m) => isStrength(m) && m.t > now - 44 * hourMs && ymd(fromMs(m.t)) != today).toList();
+  final targetStr = math.min(p.days - 1, (p.equip == 'db' && phase >= 2) ? 3 : 2).clamp(1, 3);
+  final cardioTarget = math.max(60, (exMin * .5).round());
+  final longFast = s.active != null && (now - s.active!.start) > 16 * hourMs;
   final avgSteps = steps7.isEmpty ? 0 : (steps7.reduce((a, b) => a + b) / steps7.length).round();
-  final stepTip = avgSteps > 0 && avgSteps < 7000 ? ' Langkahmu rata-rata ${avgSteps ~/ 100 * 100}/hari, jalan kaki ini juga menambah langkah.' : '';
+  final stepTip = avgSteps > 0 && avgSteps < 7000 ? ' Langkahmu rata-rata ${avgSteps ~/ 100 * 100}/hari, jalan ini juga menambah langkah.' : '';
 
-  String strengthFor() {
-    final db = p.equip == 'db';
-    if (!db) return phase == 1 ? 'p1' : 'p2';
-    if (phase == 1) return 'p1';
-    final lastDb = s.moves.reversed.where((m) => m.name.startsWith('Dumbbell')).firstOrNull;
-    return lastDb != null && lastDb.name.startsWith('Dumbbell A') ? 'd2' : 'd1';
+  // consecutive active days before today
+  var streak = 0;
+  for (var i = 1; i <= 7; i++) {
+    final d = ymd(DateTime.now().subtract(Duration(days: i)));
+    if (s.moves.any((m) => ymd(fromMs(m.t)) == d && (m.kind != 'act' || m.min >= 20))) {
+      streak++;
+    } else {
+      break;
+    }
   }
 
-  if (doneToday.isNotEmpty) {
-    return Rec('Latihan hari ini sudah selesai', 'Bagus! Sisanya cukup jalan santai dan minum air. Otot tumbuh saat istirahat.', rest: true);
+  if (strToday || (doneToday.any((m) => m.kind == 'prog'))) {
+    final hit = doneToday.expand((m) => moveMuscles(m).entries.where((e) => e.value >= 1).map((e) => e.key)).toSet();
+    return Rec('Latihan hari ini sudah selesai',
+        hit.isEmpty
+            ? 'Bagus! Sisanya cukup jalan santai dan minum air.'
+            : 'Hari ini ${muscleList(hit)} sudah dilatih. Besok aplikasi akan memilih latihan untuk otot lain atau kardio supaya ini sempat pulih.',
+        rest: true);
   }
-  var t = types[dow];
-  var why = 'Sesuai jadwal mingguanmu.';
-  final isStr = t != null && t != 'p3' && t != 'walk';
-  if (isStr && strYest) {
-    t = 'p3';
-    why = 'Kemarin sudah latihan otot, jadi hari ini kardio dulu supaya otot sempat pulih.';
-  } else if ((t == null || t == 'walk') && strThisWeek < plannedStrSoFar && !strYest) {
-    t = strengthFor();
-    why = 'Ada sesi latihan otot yang terlewat minggu ini. Kejar hari ini supaya tetap 2 hari otot per minggu.';
-  } else if (t == null && weekMin < exMin * dow / 7 - 20) {
-    t = 'walk';
-    why = 'Hari libur, tapi menit minggu ini masih tertinggal. Jalan cepat santai sudah cukup.';
+
+  if (streak >= 4 && an.totalMin >= exMin * .8) {
+    return Rec('Hari ini: istirahat aktif',
+        'Kamu sudah bergerak $streak hari berturut-turut dan target minggu ini hampir tercapai. Istirahat membantu otot pulih dan mencegah cedera. Jalan santai 10–15 menit saja.$stepTip',
+        rest: true);
   }
-  if (t != null && t != 'p3' && t != 'walk') t = strengthFor();
-  if (longFast && t != null && t != 'walk' && t != 'p1') {
-    final prog = programs.firstWhere((x) => x.id == t);
-    return Rec('Hari ini: jalan cepat $per menit',
-        'Kamu sudah puasa lebih dari 16 jam. Latihan berat saat perut kosong lama bisa bikin pusing. Jalan cepat dulu, ${prog.name} setelah makan.',
-        walkMin: per);
+
+  // candidate strength programs
+  final cands = <Program>[
+    for (final pr in programs)
+      if (pr.kind == 'str' &&
+          ((p.equip == 'db') ? (phase == 1 ? (pr.id == 'p1' || pr.id == 'd1') : pr.db) : (phase == 1 ? pr.id == 'p1' : (pr.id == 'p2' || pr.id == 'p1'))))
+        pr,
+  ];
+  Program? bestStr;
+  var bestScore = -1e9;
+  for (final pr in cands) {
+    var sc = 0.0;
+    pr.musclesAt(lvl).forEach((k, v) {
+      final deficit = math.max(0.0, 10 - (an.sets[k] ?? 0)) / 10;
+      sc += v * deficit;
+      if (an.fatigued(k) && v >= 1) sc -= v * 1.5;
+    });
+    if (sc > bestScore) {
+      bestScore = sc;
+      bestStr = pr;
+    }
   }
-  if (t == null) {
-    return Rec('Hari ini: istirahat aktif', 'Jadwal libur. Jalan santai 10–15 menit tetap bagus untuk pemulihan.$stepTip', rest: true);
+
+  final needStr = an.strDays < targetStr;
+  final bigFatigued = ['kaki', 'bokong', 'dada', 'punggung'].where(an.fatigued).toList();
+  final canStr = recentStr.isEmpty || bigFatigued.length <= 1;
+
+  Rec walk(String why) => Rec('Hari ini: jalan cepat $per menit', '$why$stepTip', walkMin: per);
+
+  if (longFast && (needStr || an.cardioMin < cardioTarget)) {
+    return walk('Kamu sudah puasa lebih dari 16 jam. Latihan berat saat perut kosong lama bisa bikin pusing, jadi jalan cepat dulu. Latihan beban lebih baik setelah makan.');
   }
-  if (t == 'walk') return Rec('Hari ini: jalan cepat $per menit', '$why Catat di "Catat aktivitas lain" setelah selesai.$stepTip', walkMin: per);
-  final prog = programs.firstWhere((x) => x.id == t);
-  final extra = math.max(0, per - prog.minutesAt(currentLvl(s)));
-  return Rec('Hari ini: ${prog.name}${extra >= 5 ? ' + jalan $extra menit' : ''}', why, programId: prog.id, walkMin: extra >= 5 ? extra : 0);
+
+  if (needStr && canStr && bestStr != null) {
+    final pm = bestStr.musclesAt(lvl);
+    final focus = an.weakest().where((k) => (pm[k] ?? 0) >= 1).take(3).toList();
+    final extra = math.max(0, per - bestStr.minutesAt(lvl));
+    final why = StringBuffer('Baru ${an.strDays} dari $targetStr hari latihan otot dalam 7 hari terakhir. ');
+    if (focus.isNotEmpty) why.write('${bestStr.name} paling banyak melatih otot yang masih kurang: ${muscleList(focus)}. ');
+    if (recentStr.isNotEmpty) why.write('Otot yang kemarin dilatih tidak jadi fokus hari ini.');
+    return Rec('Hari ini: ${bestStr.name}${extra >= 5 ? ' + jalan $extra menit' : ''}', why.toString().trim(),
+        programId: bestStr.id, walkMin: extra >= 5 ? extra : 0, focus: focus);
+  }
+
+  if (an.cardioMin + cardioToday < cardioTarget) {
+    final lastStrNames = recentStr.isEmpty ? '' : muscleList(moveMuscles(recentStr.last).entries.where((e) => e.value >= 1).map((e) => e.key));
+    final why = recentStr.isNotEmpty
+        ? 'Kemarin kamu latihan beban${lastStrNames.isNotEmpty ? ' ($lastStrNames)' : ''}, jadi hari ini kardio supaya otot itu sempat pulih sekitar 48 jam. '
+        : 'Kardio 7 hari terakhir baru ${an.cardioMin} dari $cardioTarget menit. ';
+    final intervalYest = s.moves.any((m) => m.kind == 'prog' && m.t > now - 30 * hourMs);
+    if (!intervalYest && phase >= 1 && streak < 3) {
+      final pr = programs.firstWhere((x) => x.id == 'p3');
+      final extra = math.max(0, per - pr.minutesAt(lvl));
+      return Rec('Hari ini: ${pr.name}${extra >= 5 ? ' + jalan $extra menit' : ''}',
+          '${why}Interval singkat membakar lemak setara kardio panjang dengan waktu lebih sedikit (Wewege dkk., Obes Rev 2017).',
+          programId: 'p3', walkMin: extra >= 5 ? extra : 0);
+    }
+    return walk('${why}Jalan cepat cukup dan ramah sendi.');
+  }
+
+  if (needStr && bestStr != null) {
+    return walk('Otot ${muscleList(bigFatigued)} masih pulih dari latihan kemarin. Jalan cepat dulu, latihan beban besok.');
+  }
+  return Rec('Hari ini: istirahat aktif atau jalan santai',
+      'Target latihan otot dan kardio 7 hari terakhir sudah terpenuhi. Jalan santai 15–20 menit tetap bagus.$stepTip',
+      rest: true, walkMin: 20);
 }
 
 int _weeksActive(AppData s) {
@@ -565,7 +803,6 @@ int _weeksActive(AppData s) {
   return math.max(0, ((nowMs() - first.reduce(math.min)) / (7 * dayMs)).floor());
 }
 
-int _phaseFromHistory(AppData s) => phaseOf(_weeksActive(s), paceOf(s.profile));
 
 /// Suggested daily step goal: a bit above the recent average, capped at 10k.
 int suggestedStepGoal(List<int> steps7) {
