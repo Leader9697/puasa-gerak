@@ -28,12 +28,15 @@ class Pose {
 }
 
 /// chair = seat behind the body; chairFront = chair back in front to hold;
-/// bench = chair seat under hand and knee (one-arm row).
-enum Prop { none, chair, chairFront, wall, table, bench }
+/// bench = chair seat under hand and knee (one-arm row); footRest = chair
+/// seat under the rear foot; backRest = sofa edge under the shoulders;
+/// step = one stair step under the near foot.
+enum Prop { none, chair, chairFront, wall, table, bench, footRest, backRest, step }
 
 /// What stays put while the body moves: the hips (default), the feet
-/// (push-ups against a wall or table), or the back on the floor (lying).
-enum Pin { hip, feet, back }
+/// (push-ups against a wall or table), the back on the floor (lying), or the
+/// near foot only (lunges, step-ups).
+enum Pin { hip, feet, back, foot }
 
 class Anim {
   final List<Pose> frames;
@@ -110,6 +113,29 @@ const anims = <String, Anim>{
     Pose(-90, 180, 90, 180, 90, 180, 180, 180, 180),
     Pose(-90, 100, 100, 180, 90, 180, 180, -100, -100),
   ], pin: Pin.back, pinX: 50, secs: 4),
+  // ---- harder rungs ----
+  // knees on the floor, body straight from knee to head; hands stay put
+  'kneepush': Anim([Pose(127.7, -52.3, -100, -52.3, -100, 0, 0, 0, 0), Pose(102, -78, -100, -78, -100, -101, 24.7, -101, 24.7)],
+      pin: Pin.feet, pinX: 18, secs: 2.6),
+  'pushup': Anim([Pose(115.1, -64.9, -64.9, -64.9, -64.9, 0, 0, 0, 0), Pose(102, -78, -78, -78, -78, -74.7, 42.8, -74.7, 42.8)],
+      pin: Pin.feet, pinX: 16, secs: 2.6),
+  'squat': Anim([Pose(180, 0, 0, 0, 0, 90, 90, 90, 90), Pose(145, 95, -25, 95, -25, 90, 90, 90, 90)], pin: Pin.feet, secs: 3),
+  'rlunge': Anim([Pose(180, 0, 0, 0, 0, 10, 10, 10, 10), Pose(178, 80, -10, -25, -80, 10, 10, 10, 10)], pin: Pin.foot, pinX: 58, secs: 3),
+  'gobletfull': Anim([Pose(180, 0, 0, 0, 0, 25, 165, 25, 165), Pose(155, 105, -30, 105, -30, 25, 165, 25, 165)],
+      pin: Pin.feet, db: true, oneDb: true, secs: 3.2),
+  // rear foot on a chair seat, front foot planted; hips drop straight down
+  'bulgarian': Anim([Pose(178, 22.8, 10.6, -14.5, -99.1, 0, 0, 0, 0), Pose(174, 75.3, -20.4, -32.1, -138.8, 0, 0, 0, 0)],
+      prop: Prop.footRest, pin: Pin.foot, pinX: 62, db: true, secs: 3.2),
+  'slbridge': Anim([Pose(-90, 135, 15, 95, 95, 90, 90, 90, 90), Pose(-60, 110, 5, 120, 120, 70, 70, 70, 70)], pin: Pin.back, pinX: 46, secs: 2.8),
+  // shoulders on the sofa edge, feet planted; hips drop then drive up
+  'hipthrust': Anim([Pose(-90, 90, 0, 90, 0, 105.7, 85.7, 105.7, 85.7), Pose(-110.9, 117.2, 11.4, 117.2, 11.4, 94.8, 56.8, 94.8, 56.8)],
+      prop: Prop.backRest, pin: Pin.feet, pinX: 70, dbHip: true, secs: 2.8),
+  'plank': Anim([Pose(102.6, -77.4, -77.4, -77.4, -77.4, 0, 90, 0, 90), Pose(103.4, -76.6, -76.6, -76.6, -76.6, 0, 90, 0, 90)],
+      pin: Pin.feet, pinX: 22, secs: 3),
+  'ohps': Anim([Pose(180, 0, 0, 0, 0, 30, 175, 30, 175), Pose(180, 0, 0, 0, 0, 178, 178, 178, 178)], db: true, secs: 2.4),
+  // near foot on the step, then stand on it with the other knee up
+  'stepup': Anim([Pose(178, 60, -5, 0, 0, -20, 20, 30, 70), Pose.x(180, 0, 0, 70, 0, 30, 70, -20, 20, lift: 10.6)],
+      prop: Prop.step, pin: Pin.foot, pinX: 56, secs: 1.4),
 };
 
 const _lTrunk = 28.0, _lThigh = 21.0, _lShin = 21.0, _lUa = 15.0, _lFa = 14.0, _head = 6.3, _lFoot = 6.5;
@@ -183,6 +209,7 @@ _J _solve(Pose p, Anim a) {
   }
   final px = switch (a.pin) {
     Pin.feet => (j.ft[0].x + j.ft[1].x) / 2,
+    Pin.foot => j.ft[0].x,
     _ => j.hip.x,
   };
   return j.shift(a.pinX - px, dy);
@@ -434,6 +461,21 @@ class _MannequinPainter extends CustomPainter {
         final y = math.max(first.kn[1].y + 3.4, first.ha[1].y + 2.2);
         quad([_V(x0, y, -11), _V(x1, y, -11), _V(x1, y, 3), _V(x0, y, 3)]);
         legs(x0 + 1, x1 - 1, y, 9);
+      case Prop.footRest:
+        final f = first.ft[1];
+        final y = f.y + 2.2;
+        quad([_V(f.x - 10, y, -9), _V(f.x + 8, y, -9), _V(f.x + 8, y, 9), _V(f.x - 10, y, 9)]);
+        legs(f.x - 9, f.x + 7, y, 9);
+      case Prop.backRest:
+        final x = first.neck.x;
+        final y = first.neck.y + 5;
+        quad([_V(x - 18, y, -14), _V(x + 4, y, -14), _V(x + 4, y, 14), _V(x - 18, y, 14)]);
+        quad([_V(x + 4, y, -14), _V(x + 4, 93.5, -14), _V(x + 4, 93.5, 14), _V(x + 4, y, 14)]);
+      case Prop.step:
+        final f = first.ft[0];
+        final y = f.y + 2;
+        quad([_V(f.x - 7, y, -12), _V(f.x + 12, y, -12), _V(f.x + 12, y, 12), _V(f.x - 7, y, 12)]);
+        quad([_V(f.x - 7, y, -12), _V(f.x - 7, 93.5, -12), _V(f.x - 7, 93.5, 12), _V(f.x - 7, y, 12)]);
       case Prop.none:
         break;
     }

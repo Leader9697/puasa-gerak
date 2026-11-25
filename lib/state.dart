@@ -23,6 +23,23 @@ class AppState extends ChangeNotifier {
 
   Profile get p => d.profile;
 
+  @override
+  void notifyListeners() {
+    syncLadder(d);
+    super.notifyListeners();
+  }
+
+  /// Go one rung easier on a ladder ([base] is the program's own move).
+  void stepDown(String base) {
+    d.down[base] = (d.down[base] ?? 0) + 1;
+    save();
+  }
+
+  void resetStep(String base) {
+    d.down.remove(base);
+    save();
+  }
+
   Future<void> init() async {
     d = await Store.load();
     stepsBest = await Store.getInt('stepsBest', 0);

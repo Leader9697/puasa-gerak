@@ -67,7 +67,43 @@ void main() {
     expect(r.rest, isFalse);
   });
 
-  test('every exercise has an animation and program moves cite a source', () {
+  test('every exercise has an animation and a research source', () {
+    for (final id in ex.keys) {
+      expect(anims.containsKey(id), isTrue, reason: id);
+      expect(ex[id]!.why, isNotEmpty, reason: id);
+    }
+    for (final l in ladders.entries) {
+      expect(l.value.first.id, l.key);
+      for (final r in l.value) {
+        expect(ex[r.id], isNotNull, reason: r.id);
+        if (ex[r.id]!.range != null) expect(exKeys.contains(r.id), isTrue, reason: r.id);
+      }
+    }
+  });
+
+  test('ladders climb with level and lower body weight, and can step down', () {
+    final d = AppData()..weights = [Weight('2026-11-25', 107)];
+    syncLadder(d);
+    final p2 = programs.firstWhere((p) => p.id == 'p2');
+    expect(p2.exIdsAt(1), contains('wallpush'));
+    expect(p2.exIdsAt(2), containsAll(['incline', 'squat', 'slbridge']));
+    // level 3 at BMI 33: knee push-up, not a full push-up yet
+    expect(p2.exIdsAt(3), contains('kneepush'));
+    expect(nextRungTxt('wallpush', 3), contains('BMI di bawah 30'));
+    d.weights.add(Weight('2027-06-01', 96));
+    syncLadder(d);
+    expect(p2.exIdsAt(3), contains('pushup'));
+    d.down['wallpush'] = 1;
+    syncLadder(d);
+    expect(p2.exIdsAt(3), contains('kneepush'));
+    final st = p2.seq(3).firstWhere((x) => x.ex == 'kneepush');
+    expect(st.root, 'wallpush');
+    final back = AppData.from(d.toJson());
+    expect(back.down, {'wallpush': 1});
+    syncLadder(AppData());
+  });
+
+  test('every program move has an animation', () {
     for (final p in programs) {
       for (final st in p.seq(3)) {
         expect(anims.containsKey(st.ex), isTrue, reason: st.ex);

@@ -22,11 +22,12 @@ class ProgramPreview extends StatelessWidget {
     final warm = seq.where((x) => x.type == 'warm').toList();
     final cool = seq.where((x) => x.type == 'cool').toList();
     // main part: one entry per exercise, in order of first appearance
-    final work = <String, ({int n, int sec})>{};
+    final work = <String, ({int n, int sec, String base})>{};
     for (final st in seq.where((x) => x.type == 'work')) {
       final w = work[st.ex];
-      work[st.ex] = (n: (w?.n ?? 0) + 1, sec: st.sec);
+      work[st.ex] = (n: (w?.n ?? 0) + 1, sec: st.sec, base: st.root);
     }
+    final ups = work.values.where((w) => rungIdx(w.base, lvl) > 0).length;
     final rests = seq.where((x) => x.type == 'rest' && !x.swap).map((x) => x.sec).toList();
     final swaps = seq.where((x) => x.swap).toList();
     final restSec = rests.isEmpty ? 0 : rests.reduce((a, b) => a < b ? a : b);
@@ -42,7 +43,32 @@ class ProgramPreview extends StatelessWidget {
           ]),
         );
 
-    Widget row(String id, String detail) {
+    Widget ladderInfo(String base) {
+      final l = ladders[base]!;
+      final i = rungIdx(base, lvl);
+      final top = rungTop(base, lvl);
+      final down = s.d.down[base] ?? 0;
+      final next = nextRungTxt(base, lvl);
+      final link = TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: col, decoration: TextDecoration.underline, decorationColor: col);
+      return Padding(
+        padding: const EdgeInsets.only(top: 6),
+        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Tingkat ${i + 1} dari ${l.length}${down > 0 ? ' · kamu pilih lebih mudah' : ''}',
+              style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
+          if (down == 0 && next != null) Muted(next, size: 12),
+          Wrap(spacing: 14, children: [
+            if (i > 0)
+              GestureDetector(onTap: () => s.stepDown(base), child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Text('Pakai versi lebih mudah', style: link))),
+            if (down > 0)
+              GestureDetector(
+                  onTap: () => s.resetStep(base),
+                  child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Text('Kembali ke ${ex[l[top].id]!.name}', style: link))),
+          ]),
+        ]),
+      );
+    }
+
+    Widget row(String id, String detail, [String? base]) {
       final e = ex[id]!;
       final prim = e.m.entries.where((x) => x.value >= 1).map((x) => x.key);
       return Box(
@@ -60,6 +86,7 @@ class ProgramPreview extends StatelessWidget {
               if (prim.isNotEmpty) Muted('Otot: ${muscleList(prim)}', size: 12.5),
               const SizedBox(height: 2),
               Text(e.how, style: const TextStyle(fontSize: 13, height: 1.35)),
+              if (base != null && ladders.containsKey(base)) ladderInfo(base),
             ]),
           ),
         ]),
@@ -100,7 +127,9 @@ class ProgramPreview extends StatelessWidget {
                       restSec > 0 ? 'istirahat $restSec dtk antar ${circuit ? 'gerakan' : 'set'}' : ''),
                   if (swaps.isNotEmpty)
                     Muted('Sebelum ganti gerakan ada jeda ${swaps.last.sec} dtk untuk mengatur beban dumbbell. Tekan "+15 dtk" kalau butuh lebih lama, atau "Siap" kalau sudah.', size: 12.5),
-                  for (final w in work.entries) row(w.key, circuit ? '${w.value.sec} dtk tiap putaran' : '${w.value.n} set × ${w.value.sec} dtk'),
+                  if (ups > 0)
+                    Muted('$ups gerakan sudah naik tingkat sesuai level dan berat badanmu. Kalau terlalu berat, pilih versi lebih mudah di gerakan itu.', size: 12.5),
+                  for (final w in work.entries) row(w.key, circuit ? '${w.value.sec} dtk tiap putaran' : '${w.value.n} set × ${w.value.sec} dtk', w.value.base),
                   if (cool.isNotEmpty) ...[
                     section('Pendinginan', dur(cool.fold(0, (a, x) => a + x.sec))),
                     for (final w in cool) row(w.ex, dur(w.sec)),

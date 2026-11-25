@@ -207,14 +207,16 @@ class Ex {
 }
 
 const ex = <String, Ex>{
-  'march': Ex('Jalan di tempat', 'Angkat lutut senyamannya, ayunkan tangan. Napas tetap teratur.', 'Mudah: pelan. Berat: lutut lebih tinggi.', cardio: true),
+  'march': Ex('Jalan di tempat', 'Angkat lutut senyamannya, ayunkan tangan. Napas tetap teratur.', 'Mudah: pelan. Berat: lutut lebih tinggi.', cardio: true,
+      why: 'Pemanasan aktif 5 menit menaikkan suhu otot dan memperbaiki performa latihan sesudahnya (Fradkin dkk., J Strength Cond Res 2010).'),
   'wallpush': Ex('Push-up dinding', 'Tangan di dinding selebar bahu, badan lurus, tekuk siku lalu dorong.', 'Berat: tangan di meja atau sandaran sofa yang kokoh.',
       m: {'dada': 1, 'lengan': .5, 'bahu': .5},
       why: 'Push-up melatih otot dada sama efektifnya dengan bench press pada beban sebanding (Calatayud dkk., J Strength Cond Res 2015). Versi dinding mengurangi beban untuk pemula.'),
   'sitstand': Ex('Duduk-berdiri dari kursi', 'Duduk di ujung kursi, berdiri tanpa bantuan tangan, duduk lagi pelan.', 'Mudah: pakai tangan. Berat: turun 3 hitungan.',
       m: {'kaki': 1, 'bokong': 1},
       why: 'Gerakan fungsional dasar squat. Kursi membatasi kedalaman sehingga aman untuk lutut saat berat badan masih tinggi.'),
-  'sidestep': Ex('Langkah ke samping', 'Langkah kanan-kiri bergantian, tekuk lutut sedikit, ayun tangan.', 'Berat: tambah tepuk tangan di atas kepala.', cardio: true),
+  'sidestep': Ex('Langkah ke samping', 'Langkah kanan-kiri bergantian, tekuk lutut sedikit, ayun tangan.', 'Berat: tambah tepuk tangan di atas kepala.', cardio: true,
+      why: 'Interval singkat dengan intensitas tinggi menurunkan lemak tubuh setara latihan kontinu dalam waktu lebih singkat (Wewege dkk., Obes Rev 2017). Versi tanpa lompat menjaga lutut.'),
   'bridge': Ex('Glute bridge', 'Berbaring, lutut ditekuk, angkat pinggul sampai lurus bahu-lutut, tahan 1 detik.', 'Kalau susah turun ke lantai: lakukan di kasur.',
       m: {'bokong': 1, 'pahaBlk': .5},
       why: 'Gerakan dorong pinggul memberi aktivasi otot bokong lebih tinggi daripada squat (Contreras dkk., J Appl Biomech 2015).'),
@@ -223,13 +225,18 @@ const ex = <String, Ex>{
   'birddog': Ex('Bird dog', 'Posisi merangkak, julurkan tangan kanan dan kaki kiri, tahan 2 detik, ganti.', 'Mudah: hanya tangan atau hanya kaki.',
       m: {'inti': 1, 'bokong': .5},
       why: 'Salah satu "big three" McGill untuk stabilitas tulang belakang dengan beban rendah pada punggung bawah (Ekstrom dkk., JOSPT 2007; McGill, Low Back Disorders).'),
-  'knee': Ex('Angkat lutut berdiri', 'Berdiri tegak, angkat lutut ke arah siku berlawanan bergantian.', 'Pegang kursi kalau perlu keseimbangan.', cardio: true, m: {'inti': .5}),
-  'stepjack': Ex('Step jack (tanpa lompat)', 'Langkah satu kaki ke samping sambil angkat kedua tangan, kembali, ganti kaki.', 'Cepatkan tempo saat interval cepat.', cardio: true),
-  'box': Ex('Tinju udara', 'Kuda-kuda sedikit tekuk, pukul lurus bergantian dengan cepat, perut kencang.', 'Tambah langkah maju-mundur.', cardio: true),
-  'squatpulse': Ex('Squat ke kursi', 'Duduk hampir menyentuh kursi lalu berdiri cepat.', 'Mudah: duduk penuh dulu.', cardio: true, m: {'kaki': .5}),
+  'knee': Ex('Angkat lutut berdiri', 'Berdiri tegak, angkat lutut ke arah siku berlawanan bergantian.', 'Pegang kursi kalau perlu keseimbangan.', cardio: true, m: {'inti': .5},
+      why: 'Interval singkat dengan intensitas tinggi menurunkan lemak tubuh setara latihan kontinu dalam waktu lebih singkat (Wewege dkk., Obes Rev 2017). Versi tanpa lompat menjaga lutut.'),
+  'stepjack': Ex('Step jack (tanpa lompat)', 'Langkah satu kaki ke samping sambil angkat kedua tangan, kembali, ganti kaki.', 'Cepatkan tempo saat interval cepat.', cardio: true,
+      why: 'Interval singkat dengan intensitas tinggi menurunkan lemak tubuh setara latihan kontinu dalam waktu lebih singkat (Wewege dkk., Obes Rev 2017). Versi tanpa lompat menjaga lutut.'),
+  'box': Ex('Tinju udara', 'Kuda-kuda sedikit tekuk, pukul lurus bergantian dengan cepat, perut kencang.', 'Tambah langkah maju-mundur.', cardio: true,
+      why: 'Interval singkat dengan intensitas tinggi menurunkan lemak tubuh setara latihan kontinu dalam waktu lebih singkat (Wewege dkk., Obes Rev 2017). Versi tanpa lompat menjaga lutut.'),
+  'squatpulse': Ex('Squat ke kursi', 'Duduk hampir menyentuh kursi lalu berdiri cepat.', 'Mudah: duduk penuh dulu.', cardio: true, m: {'kaki': .5},
+      why: 'Interval singkat dengan intensitas tinggi menurunkan lemak tubuh setara latihan kontinu dalam waktu lebih singkat (Wewege dkk., Obes Rev 2017). Versi tanpa lompat menjaga lutut.'),
   'calf': Ex('Jinjit', 'Berdiri pegang sandaran kursi, naik jinjit, turun pelan.', 'Berat: satu kaki.', m: {'betis': 1},
       why: 'Jinjit adalah latihan dasar untuk betis (gastroknemius dan soleus). ACSM menyarankan semua kelompok otot besar dilatih 2–3 kali seminggu (ACSM 2009).'),
-  'stretch': Ex('Peregangan', 'Tarik napas dalam, regangkan paha depan, paha belakang, dan bahu.', 'Tidak perlu memantul.'),
+  'stretch': Ex('Peregangan', 'Tarik napas dalam, regangkan paha depan, paha belakang, dan bahu.', 'Tidak perlu memantul.',
+      why: 'Pendinginan membantu napas dan detak jantung turun perlahan. Riset tidak menemukan efeknya mengurangi pegal otot keesokan hari (Van Hooren & Peake, Sports Med 2018).'),
   'goblet': Ex('Goblet squat ke kursi', 'Pegang 1 dumbbell tegak di depan dada. Turun sampai pantat menyentuh kursi, lalu berdiri. Dada tegak, lutut searah jari kaki.', 'Target 10–12 repetisi pelan.',
       range: [8, 14], m: {'kaki': 1, 'bokong': 1, 'inti': .5},
       why: 'Squat adalah gerakan inti untuk kekuatan kaki (ACSM Position Stand, Med Sci Sports Exerc 2009). Beban di depan dada menjaga badan tegak dan ramah punggung.'),
@@ -268,6 +275,40 @@ const ex = <String, Ex>{
   'deadbug': Ex('Dead bug', 'Berbaring, lengan lurus ke atas, lutut 90°. Julurkan tangan kanan ke belakang kepala dan kaki kiri lurus, punggung bawah tetap menempel lantai. Ganti sisi.', 'Mudah: gerakkan kaki saja.',
       m: {'inti': 1},
       why: 'Melatih otot perut dalam sambil menjaga punggung bawah netral, aman untuk pemula (Ekstrom dkk., JOSPT 2007).'),
+  // ---- harder rungs of the progression ladders ----
+  'kneepush': Ex('Push-up lutut', 'Lutut di lantai (alasi handuk), tangan selebar bahu. Badan lurus dari kepala ke lutut, turunkan dada, lalu dorong.', 'Mudah: kembali ke push-up meja.',
+      m: {'dada': 1, 'lengan': .5, 'bahu': .5, 'inti': .5},
+      why: 'Push-up lutut mengangkat sekitar 49% berat badan, push-up penuh sekitar 64% (Ebben dkk., J Strength Cond Res 2011). Ini anak tangga di antara push-up meja dan push-up penuh.'),
+  'pushup': Ex('Push-up', 'Tangan selebar bahu, badan lurus dari kepala ke tumit. Turunkan dada sampai hampir menyentuh lantai, lalu dorong.', 'Perut dan bokong kencang supaya pinggang tidak turun.',
+      m: {'dada': 1, 'lengan': .5, 'bahu': .5, 'inti': .5},
+      why: 'Push-up memberi peningkatan kekuatan setara bench press dengan beban sebanding (Calatayud dkk., J Strength Cond Res 2015). Mengangkat sekitar 64% berat badan (Ebben dkk., J Strength Cond Res 2011).'),
+  'squat': Ex('Squat bebas', 'Kaki selebar bahu, tangan lurus ke depan. Dorong pinggul ke belakang, turun sampai paha sejajar lantai, lalu berdiri.', 'Lutut searah jari kaki, tumit tetap menapak.',
+      m: {'kaki': 1, 'bokong': 1, 'inti': .5},
+      why: 'Squat melatih paha depan, bokong, dan paha belakang sekaligus. Kedalaman sampai paha sejajar lantai aman untuk lutut sehat (Schoenfeld, J Strength Cond Res 2010).'),
+  'rlunge': Ex('Reverse lunge', 'Berdiri tegak, langkahkan satu kaki ke belakang, turunkan lutut belakang mendekati lantai, lalu kembali. Ganti kaki bergantian.', 'Pegang kursi kalau perlu keseimbangan.',
+      m: {'kaki': 1, 'bokong': 1, 'inti': .5},
+      why: 'Latihan satu kaki memberi peningkatan kekuatan setara squat dua kaki (Speirs dkk., J Strength Cond Res 2016). Langkah ke belakang mengurangi beban lutut depan dibanding lunge maju.'),
+  'gobletfull': Ex('Goblet squat penuh', 'Pegang 1 dumbbell tegak di depan dada. Turun sedalam yang nyaman tanpa kursi, sampai paha sejajar lantai atau lebih rendah, lalu berdiri.', 'Dada tegak, tumit menapak.',
+      range: [10, 20], m: {'kaki': 1, 'bokong': 1, 'inti': .5},
+      why: 'Squat dalam memberi pertambahan otot bokong dan paha dalam lebih besar daripada squat setengah (Kubo dkk., Eur J Appl Physiol 2019).'),
+  'bulgarian': Ex('Bulgarian split squat', 'Punggung kaki belakang di atas kursi, kaki depan satu langkah besar di depan. Dumbbell di sisi badan. Turun lurus ke bawah, lalu naik. Ganti kaki di tengah waktu.', 'Mudah: tanpa dumbbell.',
+      range: [6, 14], perHand: true, m: {'kaki': 1, 'bokong': 1, 'pahaBlk': .5},
+      why: 'Split squat dengan kaki belakang ditinggikan memberi kekuatan dan aktivasi otot kaki setara squat dua kaki, dengan beban punggung jauh lebih ringan (Speirs dkk., J Strength Cond Res 2016; McCurdy dkk., J Sport Rehabil 2010).'),
+  'slbridge': Ex('Bridge satu kaki', 'Berbaring, satu lutut ditekuk, kaki lain lurus sejajar paha. Angkat pinggul dengan satu kaki, tahan 1 detik. Ganti kaki di tengah waktu.', 'Pinggul tetap rata, jangan miring.',
+      m: {'bokong': 1, 'pahaBlk': .5, 'inti': .5},
+      why: 'Bridge satu kaki memberi aktivasi bokong lebih tinggi daripada bridge dua kaki (Ekstrom dkk., JOSPT 2007).'),
+  'hipthrust': Ex('Hip thrust dumbbell', 'Punggung atas bersandar di tepi sofa atau kasur, dumbbell di atas pinggul. Dorong pinggul sampai badan lurus dari bahu ke lutut, tahan 1 detik.', 'Dagu menunduk sedikit, jangan melengkungkan punggung bawah.',
+      range: [10, 30], m: {'bokong': 1, 'pahaBlk': .5},
+      why: 'Hip thrust memberi aktivasi bokong lebih tinggi daripada squat (Contreras dkk., J Appl Biomech 2015). Bersandar di sofa memberi rentang gerak lebih besar daripada bridge di lantai.'),
+  'plank': Ex('Plank', 'Bertumpu di lengan bawah dan ujung kaki, badan lurus dari kepala ke tumit. Tahan sambil bernapas biasa.', 'Mudah: lutut di lantai.',
+      m: {'inti': 1, 'bahu': .5},
+      why: 'Plank melatih otot perut untuk menahan tulang belakang tetap netral, cara kerja inti yang dipakai sehari-hari (McGill, Strength Cond J 2010; Ekstrom dkk., JOSPT 2007).'),
+  'ohps': Ex('Overhead press berdiri', 'Berdiri tegak, kaki selebar pinggul, dumbbell setinggi bahu. Dorong ke atas, turunkan pelan. Perut dan bokong kencang.', 'Jangan melengkungkan punggung bawah.',
+      range: [4, 12], perHand: true, m: {'bahu': 1, 'lengan': .5, 'inti': .5},
+      why: 'Press berdiri memberi aktivasi bahu dan otot inti lebih tinggi daripada press duduk (Saeterbakken & Fimland, J Strength Cond Res 2013).'),
+  'stepup': Ex('Naik-turun anak tangga', 'Naik satu anak tangga dengan satu kaki, kaki lain menyusul, lalu turun. Ganti kaki depan tiap 10 detik.', 'Pegang pegangan tangga. Cepatkan tempo saat interval cepat.',
+      cardio: true, m: {'kaki': .5, 'bokong': .5},
+      why: 'Step-up menggerakkan otot kaki besar dan menaikkan detak jantung dengan benturan rendah (Simenz dkk., J Strength Cond Res 2012; Wewege dkk., Obes Rev 2017).'),
 };
 
 class WStep {
@@ -276,7 +317,75 @@ class WStep {
   final int? round, setOf;
   final bool easy;
   final bool swap; // rest used to change the dumbbell load for the next exercise
-  const WStep(this.ex, this.sec, this.type, {this.round, this.setOf, this.easy = false, this.swap = false});
+  final String? base; // the program's own move when a ladder swapped [ex]
+  const WStep(this.ex, this.sec, this.type, {this.round, this.setOf, this.easy = false, this.swap = false, this.base});
+  String get root => base ?? ex;
+  WStep as(String id) => id == ex ? this : WStep(id, sec, type, round: round, setOf: setOf, easy: easy, swap: swap, base: ex);
+}
+
+// ---------- progression ladders ----------
+/// One step of a ladder: unlocked from training level [lvl] and once BMI is
+/// below [bmi] (body-weight moves get harder as the body gets lighter, but a
+/// full push-up at a high body weight loads the shoulders and wrists a lot).
+class Rung {
+  final String id;
+  final int lvl;
+  final double bmi;
+  const Rung(this.id, {this.lvl = 1, this.bmi = 99});
+}
+
+/// Program move -> easier to harder variants. Ordered by load: each step
+/// adds load, range of motion or less support (ACSM 2009 progression models).
+const ladders = <String, List<Rung>>{
+  'wallpush': [Rung('wallpush'), Rung('incline', lvl: 2), Rung('kneepush', lvl: 3), Rung('pushup', lvl: 3, bmi: 30)],
+  'incline': [Rung('incline'), Rung('kneepush', lvl: 2), Rung('pushup', lvl: 3, bmi: 30)],
+  'sitstand': [Rung('sitstand'), Rung('squat', lvl: 2), Rung('rlunge', lvl: 3)],
+  'goblet': [Rung('goblet'), Rung('gobletfull', lvl: 2)],
+  'splitsquat': [Rung('splitsquat'), Rung('bulgarian', lvl: 2)],
+  'bridge': [Rung('bridge'), Rung('slbridge', lvl: 2)],
+  'dbbridge': [Rung('dbbridge'), Rung('hipthrust', lvl: 2)],
+  'deadbug': [Rung('deadbug'), Rung('plank', lvl: 2)],
+  'ohp': [Rung('ohp'), Rung('ohps', lvl: 2)],
+  'knee': [Rung('knee'), Rung('stepup', lvl: 2, bmi: 32)],
+};
+
+/// What the ladders see: current level, BMI and the user's step-downs.
+class LadderCtx {
+  double bmi = 99;
+  Map<String, int> down = {};
+}
+
+final ladder = LadderCtx();
+
+void syncLadder(AppData s) {
+  final h = s.profile.height;
+  ladder.bmi = s.weights.isEmpty || h <= 0 ? 99 : bmiOf(s.weights.last.kg, h);
+  ladder.down = s.down;
+}
+
+/// Highest unlocked rung index for [base] at level [lvl], ignoring step-downs.
+int rungTop(String base, int lvl) {
+  final l = ladders[base];
+  if (l == null) return 0;
+  var i = 0;
+  for (var k = 0; k < l.length; k++) {
+    if (lvl >= l[k].lvl && ladder.bmi < l[k].bmi) i = k;
+  }
+  return i;
+}
+
+int rungIdx(String base, int lvl) => math.max(0, rungTop(base, lvl) - (ladder.down[base] ?? 0));
+String rungFor(String base, int lvl) => ladders[base]?[rungIdx(base, lvl)].id ?? base;
+
+/// The next rung still locked, with what unlocks it.
+String? nextRungTxt(String base, int lvl) {
+  final l = ladders[base];
+  if (l == null) return null;
+  final i = rungTop(base, lvl);
+  if (i + 1 >= l.length) return null;
+  final r = l[i + 1];
+  final need = [if (lvl < r.lvl) 'level ${r.lvl}', if (ladder.bmi >= r.bmi) 'BMI di bawah ${r.bmi.round()}'];
+  return 'Berikutnya: ${ex[r.id]!.name} (buka di ${need.join(' dan ')})';
 }
 
 List<WStep> _sets(List<String> ids, int n, int work, int rest, int warm) {
@@ -328,11 +437,16 @@ class Program {
   final String id, name, lvl, kind, desc;
   final int color; // index into palette
   final bool db;
-  final List<WStep> Function([int lvl]) seq;
-  const Program(this.id, this.name, this.lvl, this.kind, this.desc, this.color, this.seq, {this.db = false});
+  final List<WStep> Function([int lvl]) raw;
+  const Program(this.id, this.name, this.lvl, this.kind, this.desc, this.color, this.raw, {this.db = false});
+
+  /// The session at level [l], with each move on its current ladder rung.
+  List<WStep> seq([int l = 1]) => [for (final s in raw(l)) s.as(rungFor(s.ex, l))];
   int minutesAt(int l) => (seq(l).fold<int>(0, (a, s) => a + s.sec) / 60).round();
   int get minutes => minutesAt(1);
-  List<String> get exIds => seq().where((s) => s.type == 'work').map((s) => s.ex).toSet().toList();
+  List<String> exIdsAt(int l) => seq(l).where((s) => s.type == 'work').map((s) => s.ex).toSet().toList();
+  List<String> get exIds => exIdsAt(1);
+  List<String> get baseIds => raw().where((s) => s.type == 'work').map((s) => s.ex).toSet().toList();
 
   /// Sets per muscle group for a full session at level [l].
   Map<String, double> musclesAt(int l) => setsFrom(seq(l).where((s) => s.type == 'work').map((s) => s.ex));
@@ -369,6 +483,8 @@ const programRefs = [
   'Cava E, Yeat NC, Mittendorfer B. Preserving healthy muscle during weight loss. Adv Nutr 2017. (Latihan beban menjaga otot saat defisit kalori.)',
   'Wewege M dkk. HIIT vs latihan kontinu untuk komposisi tubuh pada orang dengan berat berlebih. Obes Rev 2017.',
   'Calatayud J dkk. J Strength Cond Res 2015 · Contreras B dkk. J Appl Biomech 2015 · McAllister MJ dkk. J Strength Cond Res 2014 · Fenwick CM dkk. J Strength Cond Res 2009 · Speirs DE dkk. J Strength Cond Res 2016 · Saeterbakken AH & Fimland MS. J Strength Cond Res 2013 · Ekstrom RA dkk. JOSPT 2007 · Paoli A dkk. J Strength Cond Res 2009 · Oliveira LF dkk. J Sports Sci Med 2009.',
+  'Tangga tingkat: Ebben WP dkk. J Strength Cond Res 2011 (beban push-up) · Schoenfeld BJ. J Strength Cond Res 2010 (squat) · Kubo K dkk. Eur J Appl Physiol 2019 (squat dalam) · McCurdy K dkk. J Sport Rehabil 2010 (split squat) · McGill SM. Strength Cond J 2010 (plank) · Simenz CJ dkk. J Strength Cond Res 2012 (step-up).',
+  'Pemanasan dan pendinginan: Fradkin AJ dkk. J Strength Cond Res 2010 · Van Hooren B & Peake JM. Sports Med 2018.',
 ];
 
 double loadOf(AppData s, String id) => s.loads[id] ?? (ex[id]!.range?[0] ?? 0).toDouble();

@@ -356,7 +356,7 @@ class _TodayRec extends StatelessWidget {
             tilePadding: EdgeInsets.zero,
             title: const Text('Beban yang disarankan', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
             children: [
-              for (final id in prog.exIds)
+              for (final id in prog.exIdsAt(currentLvl(s.d)))
                 Padding(
                   padding: const EdgeInsets.only(bottom: 8),
                   child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -380,7 +380,7 @@ class _ProgramCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
-    final ids = pr.exIds;
+    final ids = pr.exIdsAt(currentLvl(s.d));
     return Box(
       hero: C.progColors[pr.color],
       child: Col([
@@ -395,7 +395,7 @@ class _ProgramCard extends StatelessWidget {
         ]),
         Muted(pr.desc),
         if (pr.musclesAt(1).isNotEmpty)
-          Text('Melatih: ${muscleList((pr.musclesAt(1).entries.where((e) => e.value >= 1).toList()..sort((a, b) => b.value.compareTo(a.value))).map((e) => e.key))}',
+          Text('Melatih: ${muscleList((pr.musclesAt(currentLvl(s.d)).entries.where((e) => e.value >= 1).toList()..sort((a, b) => b.value.compareTo(a.value))).map((e) => e.key))}',
               style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
         Btn('Lihat gerakan & mulai', onTap: () => startProgram(context, pr)),
         Theme(

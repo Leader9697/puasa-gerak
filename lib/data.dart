@@ -116,7 +116,7 @@ class Move {
   Map<String, dynamic> toJson() => {'t': t, 'min': min, 'name': name, 'kind': kind, if (m.isNotEmpty) 'm': m, if (c != null) 'c': c};
 }
 
-const exKeys = ['goblet', 'floorpress', 'row1', 'rdl', 'carry', 'sumo', 'ohp', 'row2', 'dbbridge', 'curl', 'splitsquat'];
+const exKeys = ['goblet', 'floorpress', 'row1', 'rdl', 'carry', 'sumo', 'ohp', 'row2', 'dbbridge', 'curl', 'splitsquat', 'gobletfull', 'bulgarian', 'hipthrust', 'ohps'];
 
 class AppData {
   int updatedAt = 0;
@@ -126,11 +126,13 @@ class AppData {
   List<Fast> fasts = [];
   List<Weight> weights = [Weight(todayStr(), 107)];
   List<Move> moves = [];
+  Map<String, int> down = {}; // ladder steps the user chose to go back
 
   Map<String, dynamic> toJson() => {
         'v': 1, 'updatedAt': updatedAt, 'profile': profile.toJson(), 'loads': loads,
         'active': active?.toJson(), 'fasts': fasts.map((e) => e.toJson()).toList(),
         'weights': weights.map((e) => e.toJson()).toList(), 'moves': moves.map((e) => e.toJson()).toList(),
+        'down': down,
       };
 
   static AppData from(dynamic o) {
@@ -162,6 +164,12 @@ class AppData {
       (o['loads'] as Map).forEach((k, v) {
         final x = _n(v, 0);
         if (exKeys.contains(k) && x > 0 && x <= 30) b.loads[k as String] = x;
+      });
+    }
+    if (o['down'] is Map) {
+      (o['down'] as Map).forEach((k, v) {
+        final x = _n(v, 0).round();
+        if (k is String && x > 0 && x < 5) b.down[k] = x;
       });
     }
     if (o['moves'] is List) {
