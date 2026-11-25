@@ -349,7 +349,7 @@ class _FitCard extends StatelessWidget {
       tint: tintOf(context, warn ? C.orange : C.green, .14),
       child: Col([
         Row(children: [
-          Icon(warn ? Icons.tune_rounded : Icons.check_circle_rounded, color: warn ? C.orange : C.green),
+          Icon(warn ? Icons.timer_outlined : Icons.check_circle_rounded, color: warn ? C.orange : C.green),
           const SizedBox(width: 8),
           Expanded(child: H3('${f.n} puasa terakhir · rata-rata ${fmt1(f.avg)} jam')),
         ]),

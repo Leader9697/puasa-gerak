@@ -69,7 +69,7 @@ jobs:
       - name: Build APK
         if: steps.mode.outputs.mode == 'plain'
         run: |
-          flutter build apk --release --build-number=${{ github.run_number }} --build-name=$VER
+          flutter build apk --release --no-tree-shake-icons --build-number=${{ github.run_number }} --build-name=$VER
           cp build/app/outputs/flutter-apk/app-release.apk PuasaGerak-$VER.apk
 
       - uses: shorebirdtech/setup-shorebird@v1
@@ -94,7 +94,7 @@ jobs:
         with:
           platform: android
           flutter-version: 3.50.1
-          args: --artifact apk -- --build-number=${{ github.run_number }} --build-name=${{ env.VER }}
+          args: --artifact apk -- --no-tree-shake-icons --build-number=${{ github.run_number }} --build-name=${{ env.VER }}
 
       - name: Collect APK
         if: steps.mode.outputs.mode == 'release'
