@@ -2,6 +2,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'data.dart';
 import 'logic.dart';
+import 'native.dart';
 import 'notify.dart';
 import 'state.dart';
 import 'ui/common.dart';
@@ -79,6 +80,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (st == AppLifecycleState.resumed) {
       final s = AppScope.read(context);
       if (s.p.steps) s.refreshSteps();
+      NativeBridge.sync(s.d);
       setState(() {});
     }
   }

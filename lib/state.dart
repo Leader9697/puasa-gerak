@@ -5,6 +5,7 @@ import 'package:material_ui/material_ui.dart';
 
 import 'data.dart';
 import 'logic.dart';
+import 'native.dart';
 import 'notify.dart';
 import 'steps.dart';
 
@@ -23,6 +24,7 @@ class AppState extends ChangeNotifier {
     loaded = true;
     notifyListeners();
     unawaited(Notifier.sync(d));
+    unawaited(NativeBridge.sync(d));
     if (p.steps) unawaited(refreshSteps());
   }
 
@@ -30,6 +32,7 @@ class AppState extends ChangeNotifier {
     d.updatedAt = nowMs();
     unawaited(Store.save(d));
     unawaited(Notifier.sync(d));
+    unawaited(NativeBridge.sync(d));
     if (!quiet) notifyListeners();
   }
 

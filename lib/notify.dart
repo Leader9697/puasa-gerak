@@ -24,7 +24,7 @@ class Notifier {
         tz.setLocalLocation(tz.getLocation('Asia/Jakarta'));
       }
       await _p.initialize(
-        settings: const InitializationSettings(android: AndroidInitializationSettings('@mipmap/ic_launcher')),
+        settings: const InitializationSettings(android: AndroidInitializationSettings('@drawable/ic_stat_timer')),
       );
       _ready = true;
     } catch (_) {
@@ -73,18 +73,8 @@ class Notifier {
       if (!s.profile.remind) return;
       final a = s.active;
       if (a != null) {
+        // The live stopwatch notification is posted natively (see FastNotification.kt).
         final end = a.start + a.target * hourMs;
-        await _p.show(
-          id: _idOngoing,
-          title: 'Sedang puasa ${a.target}:${24 - a.target}',
-          body: 'Target selesai jam ${hm(end)}. Tetap minum air putih.',
-          notificationDetails: NotificationDetails(
-            android: AndroidNotificationDetails('ongoing', 'Timer puasa berjalan',
-                channelDescription: 'Menampilkan lama puasa di bilah notifikasi',
-                importance: Importance.low, priority: Priority.low, ongoing: true, autoCancel: false,
-                onlyAlertOnce: true, showWhen: true, usesChronometer: true, when: a.start, color: const Color(0xFFE8590C)),
-          ),
-        );
         await _at(_idSoon, end - hourMs, 'Puasa tinggal 1 jam lagi', 'Sedikit lagi! Target ${a.target} jam tercapai jam ${hm(end)}.');
         await _at(_idDone, end, 'Target puasa tercapai! 🎉', 'Puasa ${a.target} jam selesai. Buka aplikasi untuk mencatatnya (+50 XP).');
       } else if (s.fasts.isNotEmpty) {
