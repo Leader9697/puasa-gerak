@@ -10,7 +10,8 @@ import 'common.dart';
 import 'player.dart';
 
 void startProgram(BuildContext c, Program p) {
-  Navigator.of(c).push(MaterialPageRoute(builder: (_) => PlayerScreen(program: p), fullscreenDialog: true));
+  final lvl = currentLvl(AppScope.read(c).d);
+  Navigator.of(c).push(MaterialPageRoute(builder: (_) => PlayerScreen(program: p, lvl: lvl), fullscreenDialog: true));
 }
 
 class MoveTab extends StatefulWidget {
@@ -92,6 +93,7 @@ class _MoveTabState extends State<MoveTab> {
               : 'Target minggu ini tercapai. Luar biasa!'),
         ]),
       ),
+      const _TodayRec(),
       _StepsCard(openSettings: widget.openSettings),
       if (hasPlan(p)) const _Schedule(),
       const Padding(
@@ -220,6 +222,15 @@ class _StepsCard extends StatelessWidget {
           ]),
         ),
         Muted('Rata-rata 7 hari ${_thousands(avg)} langkah. Hijau = target tercapai. Langkah tidak otomatis ditambahkan ke menit olahraga; catat jalan cepat secara manual.'),
+        if (suggestedStepGoal(st) != p.stepGoal)
+          Row(children: [
+            Expanded(child: Muted('Saran target berikutnya: ${_thousands(suggestedStepGoal(st))} langkah/hari (rata-rata + 1.000, maks. 10.000).', size: 12.5)),
+            const SizedBox(width: 8),
+            Btn('Pakai', small: true, color: C.blue, onTap: () {
+              p.stepGoal = suggestedStepGoal(st);
+              s.touch();
+            }),
+          ]),
       ], gap: 8),
     );
   }
@@ -244,26 +255,11 @@ class _Schedule extends StatelessWidget {
     final pn = planNow(p);
     final types = sessionTypes(p, pn.phase);
     final dow = DateTime.now().weekday - 1;
-    final per = (pn.exMin / p.days).round();
     const names = {
       'd1': ('DB A', C.blue), 'd2': ('DB B', C.blue), 'p1': ('Ringan', C.blue), 'p2': ('Kekuatan', C.blue),
       'p3': ('Kardio', C.red), 'walk': ('Jalan', C.green),
     };
     final doneDays = weekMoves(s.d).map((m) => fromMs(m.t).weekday - 1).toSet();
-    final t = types[dow];
-    Widget today;
-    if (t == null) {
-      today = const Muted('Hari ini jadwal libur. Jalan santai 10–15 menit tetap bagus untuk pemulihan.');
-    } else if (t == 'walk') {
-      today = Text('Hari ini: jalan cepat $per menit. Catat di bagian "Catat aktivitas lain" setelah selesai.');
-    } else {
-      final prog = programs.firstWhere((x) => x.id == t);
-      final len = prog.minutes, extra = math.max(0, per - len);
-      today = Col([
-        Text('Hari ini: ${prog.name} ($len menit)${extra >= 5 ? ' lalu jalan cepat $extra menit.' : '.'}'),
-        Btn('Mulai latihan hari ini', color: C.blue, onTap: () => startProgram(context, prog)),
-      ], gap: 8);
-    }
     final pal = Pal.of(context);
     return Box(
       child: Col([
@@ -272,6 +268,7 @@ class _Schedule extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Eyebrow('Jadwal dari rencanamu'),
             H3('Minggu ke-${pn.w + 1} · ${pn.exMin} menit'),
+            if (pn.nextExMin > pn.exMin) Muted('Minggu depan naik ke ${pn.nextExMin} menit · ${lvlTxt(pn.lvl)}', size: 12.5) else Muted('Volume penuh · ${lvlTxt(pn.lvl)}', size: 12.5),
           ])),
           Pill(phaseTxt[pn.phase]!, color: C.green),
         ]),
@@ -294,8 +291,55 @@ class _Schedule extends StatelessWidget {
               ),
             ),
         ]),
-        today,
+        const Muted('Rekomendasi hari ini di atas bisa berbeda dari jadwal kalau ada sesi yang terlewat atau kemarin sudah latihan otot.', size: 12.5),
       ]),
+    );
+  }
+}
+
+class _TodayRec extends StatelessWidget {
+  const _TodayRec();
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final r = recommendToday(s.d, steps7: s.stepsStatus == StepsStatus.ok ? s.steps7 : const []);
+    final prog = r.programId == null ? null : programs.firstWhere((x) => x.id == r.programId);
+    final col = prog != null ? C.progColors[prog.color] : (r.rest ? C.green : C.blue);
+    return Box(
+      tint: tintOf(context, col, .18),
+      child: Col([
+        Row(children: [
+          Icon(r.rest ? Icons.self_improvement : (prog != null ? Icons.fitness_center : Icons.directions_walk), color: col),
+          const SizedBox(width: 8),
+          const Expanded(child: Eyebrow('Rekomendasi otomatis')),
+        ]),
+        Text(r.title, style: display(19, color: Pal.of(context).ink, w: FontWeight.w700)),
+        Muted(r.why),
+        if (prog != null) Btn('Mulai ${prog.name} (${prog.minutesAt(currentLvl(s.d))} menit)', color: col, onTap: () => startProgram(context, prog)),
+        if (prog == null && r.walkMin > 0)
+          Btn('Sudah jalan ${r.walkMin} menit, catat', color: col, onTap: () {
+            s.addMove(Move(nowMs(), r.walkMin, 'Jalan cepat', 'act'));
+            toast(context, '+${r.walkMin} menit tercatat');
+          }),
+        if (prog != null && prog.db)
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: const Text('Beban yang disarankan', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+            children: [
+              for (final id in prog.exIds)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    SizedBox(width: 64, child: Text('${fmtKg(loadOf(s.d, id))} kg', style: const TextStyle(fontWeight: FontWeight.w800, fontFeatures: tnum))),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                      Text(ex[id]!.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                      Muted(loadTip(s.d, id), size: 12.5),
+                    ])),
+                  ]),
+                ),
+            ],
+          ),
+      ], gap: 8),
     );
   }
 }
@@ -310,9 +354,9 @@ class _ProgramCard extends StatelessWidget {
     return Box(
       hero: C.progColors[pr.color],
       child: Col([
-        Row(children: [Expanded(child: H3(pr.name)), Pill('${pr.minutes} menit')]),
+        Row(children: [Expanded(child: H3(pr.name)), Pill('${pr.minutesAt(currentLvl(s.d))} menit')]),
         Wrap(spacing: 6, runSpacing: 6, children: [
-          for (final t in [pr.lvl, pr.db ? 'Dumbbell s.d. 30 kg' : 'Tanpa alat', 'Ramah sendi'])
+          for (final t in [pr.lvl, if (currentLvl(s.d) > 1 && pr.id != 'p1') 'Level ${currentLvl(s.d)}', pr.db ? 'Dumbbell s.d. 30 kg' : 'Tanpa alat', 'Ramah sendi'])
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
               decoration: BoxDecoration(color: Colors.white.withValues(alpha: .2), borderRadius: BorderRadius.circular(8)),

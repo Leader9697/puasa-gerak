@@ -110,7 +110,16 @@ class PlanTab extends StatelessWidget {
               Expanded(child: _PaceBtn(k: k, on: p.pace == k, wk: simulate(k, p), onTap: () => s.setPace(k))),
             ],
           ])),
-          const Muted('Bedanya di kalori harian. "Cepat" lebih berat dijalani dan lebih rawan berhenti di tengah jalan. Yang paling bagus adalah kecepatan yang bisa kamu jalani terus.'),
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: tintOf(context, C.blue), borderRadius: BorderRadius.circular(12)),
+            child: Col([
+              Text('Latihan untuk kecepatan ${paces[p.pace]!.l}', style: const TextStyle(fontWeight: FontWeight.w700)),
+              Muted(paces[p.pace]!.prog, size: 13),
+              _RampBars(p: p),
+            ], gap: 6),
+          ),
+          const Muted('Bedanya di kalori harian dan seberapa cepat latihan naik. "Cepat" lebih berat dijalani dan lebih rawan berhenti di tengah jalan. Yang paling bagus adalah kecepatan yang bisa kamu jalani terus.'),
         ]),
       ),
       Box(
@@ -188,6 +197,8 @@ class _PaceBtn extends StatelessWidget {
             FittedBox(child: Text(durText(wk), style: display(21, color: fg))),
             Text('${bln[d.month - 1]} ${d.year} · ±${kcal(wk[0].intake)} kkal', style: TextStyle(fontSize: 11.5, color: mu)),
             Text(paces[k]!.d, style: TextStyle(fontSize: 11.5, color: mu)),
+            const SizedBox(height: 4),
+            Text('Olahraga ${wk[0].exMin} → ${wk.map((x) => x.exMin).reduce(math.max)} mnt/mgg', style: TextStyle(fontSize: 11.5, color: fg, fontWeight: FontWeight.w700)),
           ]),
         ),
       ),
@@ -319,6 +330,7 @@ class _PlanFormState extends State<PlanForm> {
   String exp = 'new', equip = 'none';
   final age = TextEditingController(), h = TextEditingController(), kg = TextEditingController(), goal = TextEditingController();
   bool _init = false;
+  String? autoWhy;
 
   @override
   void didChangeDependencies() {
@@ -384,6 +396,27 @@ class _PlanFormState extends State<PlanForm> {
           ],
           onChanged: (v) => setState(() => act = v ?? act),
         ),
+        Container(
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(color: tintOf(context, C.green), borderRadius: BorderRadius.circular(12)),
+          child: Col([
+            const Text('Bingung pilih jadwal?', style: TextStyle(fontWeight: FontWeight.w700)),
+            if (autoWhy != null) Muted(autoWhy!, size: 12.5) else const Muted('Biar aplikasi yang memilih hari, durasi, dan jenis latihan dari BMI dan aktivitasmu.', size: 12.5),
+            Align(
+              alignment: Alignment.centerLeft,
+              child: Btn('Pilihkan otomatis', small: true, onTap: () {
+                final k = _num(kg), hh = _num(h);
+                if (k < 30 || hh < 120) return toast(context, 'Isi tinggi dan berat dulu');
+                final a = autoPlan(k, hh, act, equip);
+                setState(() {
+                  days = a.days;
+                  sess = a.sess;
+                  autoWhy = a.why;
+                });
+              }),
+            ),
+          ], gap: 6),
+        ),
         lbl('Olahraga berapa hari per minggu?'),
         Seg<int>(opts: const [(2, '2'), (3, '3'), (4, '4'), (5, '5'), (6, '6')], value: days, onChanged: (v) => setState(() => days = v)),
         lbl('Berapa menit per sesi?'),
@@ -409,5 +442,43 @@ class _PlanFormState extends State<PlanForm> {
         }),
       ], gap: 10),
     );
+  }
+}
+
+/// Small bar chart: weekly exercise minutes for the first 16 weeks of the chosen pace.
+class _RampBars extends StatelessWidget {
+  final Profile p;
+  const _RampBars({required this.p});
+  @override
+  Widget build(BuildContext context) {
+    final pal = Pal.of(context);
+    final now = weekIdx(p);
+    final mins = [for (var w = 0; w < 16; w++) exMinOf(w, p)];
+    final lv = [for (var w = 0; w < 16; w++) intensityOf(w, p)];
+    final mx = mins.reduce(math.max).toDouble();
+    return Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+      SizedBox(
+        height: 70,
+        child: Row(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          for (var w = 0; w < 16; w++)
+            Expanded(
+              child: Container(
+                margin: const EdgeInsets.symmetric(horizontal: 1.5),
+                height: 70 * mins[w] / mx,
+                decoration: BoxDecoration(
+                  color: w == now ? C.orange : (lv[w] == 3 ? C.blue : (lv[w] == 2 ? C.blue.withValues(alpha: .7) : C.blue.withValues(alpha: .45))),
+                  borderRadius: const BorderRadius.vertical(top: Radius.circular(4)),
+                ),
+              ),
+            ),
+        ]),
+      ),
+      const SizedBox(height: 4),
+      Row(children: [
+        Expanded(child: Text('Mgg 1 · ${mins.first} mnt', style: TextStyle(fontSize: 11, color: pal.muted))),
+        Expanded(child: Text('Mgg 16 · ${mins.last} mnt', textAlign: TextAlign.right, style: TextStyle(fontSize: 11, color: pal.muted))),
+      ]),
+      Text('Oranye = minggu ini. Biru makin tua = level latihan lebih tinggi.', style: TextStyle(fontSize: 11, color: pal.muted)),
+    ]);
   }
 }

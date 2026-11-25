@@ -12,13 +12,14 @@ import 'common.dart';
 
 class PlayerScreen extends StatefulWidget {
   final Program program;
-  const PlayerScreen({super.key, required this.program});
+  final int lvl;
+  const PlayerScreen({super.key, required this.program, this.lvl = 1});
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  late final List<WStep> seq = widget.program.seq();
+  late final List<WStep> seq = widget.program.seq(widget.lvl);
   int i = 0, left = 0, done = 0;
   bool paused = false, finished = false;
   Timer? _t;

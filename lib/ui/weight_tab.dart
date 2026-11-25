@@ -96,6 +96,7 @@ class _WeightTabState extends State<WeightTab> {
           const Muted('Timbang di waktu yang sama, misalnya pagi setelah ke toilet. Berat harian naik-turun 0,5–1 kg itu normal, lihat tren mingguannya.'),
         ]),
       ),
+      const _IdealCard(),
       Box(
         child: Col([
           const H3('Target bertahap'),
@@ -216,4 +217,58 @@ class WeightChart extends CustomPainter {
 
   @override
   bool shouldRepaint(WeightChart o) => true;
+}
+
+class _IdealCard extends StatelessWidget {
+  const _IdealCard();
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final p = s.p;
+    final cur = s.d.weights.isNotEmpty ? s.d.weights.last.kg : (p.pKg > 0 ? p.pKg : 107.0);
+    final iw = idealWeight(p.height, p.sex, cur);
+    final pal = Pal.of(context);
+    final h2 = math.pow(p.height / 100, 2).toDouble();
+    return Box(
+      child: Col([
+        const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Eyebrow('Saran untuk kamu'), H3('Berat ideal')]),
+        Row(children: [
+          Expanded(child: Stat('Rentang sehat (BMI 18,5–24,9)', '${fmtKg((iw.bmiLow * 2).round() / 2)}–${fmtKg((iw.bmiHigh * 2).floor() / 2)} kg', bg: tintOf(context, C.purple))),
+          const SizedBox(width: 10),
+          Expanded(child: Stat('Titik tengah (BMI 22)', '${fmtKg((iw.bmi22 * 2).round() / 2)} kg', bg: tintOf(context, C.purple))),
+        ]),
+        Muted('Untuk tinggi ${fmtKg(p.height)} cm. Rumus berat ideal klasik (Devine ${fmtKg(iw.devine.roundToDouble())}, Robinson ${fmtKg(iw.robinson.roundToDouble())}, Miller ${fmtKg(iw.miller.roundToDouble())}, Hamwi ${fmtKg(iw.hamwi.roundToDouble())} kg) memberi rata-rata sekitar ${fmtKg(iw.formulaAvg.roundToDouble())} kg.${p.sex.isEmpty ? ' Dihitung dengan rumus pria; isi jenis kelamin di menu Rencana kalau perlu.' : ''}', size: 12.5),
+        const Text('Saran bertahap dari berat sekarang', style: TextStyle(fontWeight: FontWeight.w700)),
+        Column(children: [
+          for (var i = 0; i < iw.steps.length; i++)
+            Builder(builder: (_) {
+              final st = iw.steps[i];
+              final isGoal = (p.goal - st.$2).abs() < 0.3;
+              return Container(
+                padding: const EdgeInsets.symmetric(vertical: 10),
+                decoration: BoxDecoration(border: i == 0 ? null : Border(top: BorderSide(color: pal.line))),
+                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Row(children: [
+                    Expanded(child: Text('${i + 1}. ${st.$1}', style: const TextStyle(fontWeight: FontWeight.w700))),
+                    Text('${fmt1(st.$2)} kg', style: display(17, color: C.purple)),
+                  ]),
+                  Muted('BMI ${fmt1(st.$2 / h2)} · turun ${fmt1(cur - st.$2)} kg dari sekarang', size: 12.5),
+                  const SizedBox(height: 2),
+                  Text(st.$3, style: const TextStyle(fontSize: 13, height: 1.35)),
+                  const SizedBox(height: 6),
+                  isGoal
+                      ? Pill('Ini targetmu sekarang', color: pal.good)
+                      : Btn('Jadikan target', small: true, ghost: true, onTap: () {
+                          p.goal = st.$2;
+                          s.touch();
+                          toast(context, 'Target diubah ke ${fmt1(st.$2)} kg. Hitung ulang di menu Rencana untuk tanggal barunya.');
+                        }),
+                ]),
+              );
+            }),
+        ]),
+        const Muted('Sasaran dekat lebih mudah dijaga. Setelah tercapai, naikkan ke langkah berikutnya.', size: 12.5),
+      ]),
+    );
+  }
 }

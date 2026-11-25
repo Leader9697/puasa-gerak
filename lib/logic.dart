@@ -221,10 +221,10 @@ List<WStep> _circuit(List<String> ids, int work, int rest, int rounds, int warm)
   return seq;
 }
 
-List<WStep> _intervals() {
+List<WStep> _intervals([int lvl = 1]) {
   final seq = <WStep>[const WStep('march', 120, 'warm')];
   const fast = ['stepjack', 'box', 'knee', 'squatpulse'];
-  for (var i = 0; i < 8; i++) {
+  for (var i = 0; i < 6 + 2 * lvl; i++) {
     seq.add(WStep(fast[i % 4], 30, 'work', round: i + 1));
     seq.add(const WStep('march', 30, 'rest', easy: true));
   }
@@ -236,16 +236,17 @@ class Program {
   final String id, name, lvl, kind, desc;
   final int color; // index into palette
   final bool db;
-  final List<WStep> Function() seq;
+  final List<WStep> Function([int lvl]) seq;
   const Program(this.id, this.name, this.lvl, this.kind, this.desc, this.color, this.seq, {this.db = false});
-  int get minutes => (seq().fold<int>(0, (a, s) => a + s.sec) / 60).round();
+  int minutesAt(int l) => (seq(l).fold<int>(0, (a, s) => a + s.sec) / 60).round();
+  int get minutes => minutesAt(1);
   List<String> get exIds => seq().where((s) => s.type == 'work').map((s) => s.ex).toSet().toList();
 }
 
-List<WStep> _p1() => _circuit(['wallpush', 'sitstand', 'sidestep', 'calf', 'knee'], 30, 30, 2, 120);
-List<WStep> _p2() => _circuit(['sitstand', 'wallpush', 'bridge', 'row', 'birddog', 'calf'], 40, 20, 3, 150);
-List<WStep> _d1() => _sets(['goblet', 'floorpress', 'row1', 'rdl', 'carry'], 3, 40, 40, 150);
-List<WStep> _d2() => _sets(['sumo', 'ohp', 'row2', 'dbbridge', 'curl'], 3, 40, 40, 150);
+List<WStep> _p1([int lvl = 1]) => _circuit(['wallpush', 'sitstand', 'sidestep', 'calf', 'knee'], 30, 30, 2, 120);
+List<WStep> _p2([int lvl = 1]) => _circuit(['sitstand', 'wallpush', 'bridge', 'row', 'birddog', 'calf'], 40, 20, lvl >= 3 ? 4 : 3, 150);
+List<WStep> _d1([int lvl = 1]) => _sets(['goblet', 'floorpress', 'row1', 'rdl', 'carry'], lvl >= 3 ? 4 : 3, 40, lvl >= 2 ? 35 : 40, 150);
+List<WStep> _d2([int lvl = 1]) => _sets(['sumo', 'ohp', 'row2', 'dbbridge', 'curl'], lvl >= 3 ? 4 : 3, 40, lvl >= 2 ? 35 : 40, 150);
 
 // color: 0 green, 1 blue, 2 purple, 3 pink, 4 red
 const programs = [
@@ -262,26 +263,55 @@ double loadOf(AppData s, String id) => s.loads[id] ?? (ex[id]!.range?[0] ?? 0).t
 class Pace {
   final String l, d;
   final int def;
-  const Pace(this.l, this.def, this.d);
+  final double startF, maxF; // weekly exercise volume as a share of days × minutes
+  final int rampWeeks; // weeks to go from startF to maxF
+  final List<int> fastSteps; // weeks at which fasting moves 13 -> 14 -> 16
+  final String prog; // short description of the training progression
+  const Pace(this.l, this.def, this.d, this.startF, this.maxF, this.rampWeeks, this.fastSteps, this.prog);
 }
 
 const paces = {
-  'santai': Pace('Santai', 350, 'Paling mudah dijaga'),
-  'sedang': Pace('Sedang', 550, 'Seimbang'),
-  'cepat': Pace('Cepat', 750, 'Butuh disiplin'),
+  'santai': Pace('Santai', 350, 'Paling mudah dijaga', .5, 1.0, 16, [3, 6],
+      'Menit olahraga naik pelan tiap minggu selama 16 minggu. Di fase akhir interval jadi 10 putaran dan istirahat antar set lebih singkat.'),
+  'sedang': Pace('Sedang', 550, 'Seimbang', .6, 1.0, 12, [2, 4],
+      'Menit olahraga naik tiap minggu selama 12 minggu. Interval naik 8 → 10 → 12 putaran, dumbbell 3 → 4 set.'),
+  'cepat': Pace('Cepat', 750, 'Butuh disiplin', .7, 1.2, 8, [1, 2],
+      'Menit olahraga naik cepat dalam 8 minggu sampai 120% jadwalmu (tambahan dari jalan kaki). Interval dan set dumbbell naik lebih awal.'),
 };
 
 const phaseTxt = {1: 'Fase 1 · Adaptasi', 2: 'Fase 2 · Membangun', 3: 'Fase 3 · Konsisten'};
 
 bool hasPlan(Profile p) => p.pStart > 0 && p.pKg > 0 && p.sex.isNotEmpty && p.age > 0;
-int phaseOf(int wk) => wk < 4 ? 1 : (wk < 12 ? 2 : 3);
-int exMinOf(int wk, Profile p) {
-  final full = p.days * p.sess;
-  const f = {1: .6, 2: .85, 3: 1.0};
-  return ((full * f[phaseOf(wk)]!) / 5).round() * 5;
+Pace paceOf(Profile p, [String? k]) => paces[k ?? p.pace] ?? paces['sedang']!;
+int phaseOf(int wk, [Pace? pc]) {
+  final r = (pc ?? paces['sedang']!).rampWeeks;
+  return wk < (r / 3).round() ? 1 : (wk < r ? 2 : 3);
 }
 
-int fastOf(int wk, Profile p) => p.exp == 'yes' ? 16 : (wk < 2 ? 13 : (wk < 4 ? 14 : 16));
+/// Weekly exercise minutes: grows a little every week until the ramp ends.
+int exMinOf(int wk, Profile p, [String? pace]) {
+  final pc = paceOf(p, pace);
+  final full = p.days * p.sess;
+  final f = pc.startF + (pc.maxF - pc.startF) * math.min(1, wk / pc.rampWeeks);
+  return ((full * f) / 5).round() * 5;
+}
+
+/// Training intensity level 1..3 (more sets/rounds), depends on pace and phase.
+int intensityOf(int wk, Profile p, [String? pace]) {
+  final pc = paceOf(p, pace);
+  final ph = phaseOf(wk, pc);
+  final k = pace ?? p.pace;
+  if (k == 'santai') return ph >= 3 ? 2 : 1;
+  if (k == 'cepat') return math.min(3, ph + (wk >= pc.rampWeeks ~/ 2 ? 1 : 0));
+  return ph;
+}
+
+int fastOf(int wk, Profile p, [String? pace]) {
+  if (p.exp == 'yes') return 16;
+  final fs = paceOf(p, pace).fastSteps;
+  return wk < fs[0] ? 13 : (wk < fs[1] ? 14 : 16);
+}
+
 double bmrOf(double kg, Profile p) => 10 * kg + 6.25 * p.height - 5 * p.age + (p.sex == 'm' ? 5 : -161);
 
 class Wk {
@@ -296,11 +326,11 @@ List<Wk> simulate(String pace, Profile p) {
   var kg = p.pKg;
   for (var w = 0; w <= 260; w++) {
     final tdee = bmrOf(kg, p) * p.act;
-    final exMin = exMinOf(w, p);
+    final exMin = exMinOf(w, p, pace);
     final exK = exMin * (5 - 1) * 3.5 * kg / 200 / 7;
     final intake = math.max(minI, tdee - paces[pace]!.def);
     final deficit = tdee + exK - intake;
-    wk.add(Wk(w, p.pStart + w * 7 * dayMs, kg, intake, exMin, fastOf(w, p), deficit));
+    wk.add(Wk(w, p.pStart + w * 7 * dayMs, kg, intake, exMin, fastOf(w, p, pace), deficit));
     if (kg <= p.goal) break;
     kg = math.max(p.goal, kg - math.min(kg * .01, deficit * 7 / 7700));
   }
@@ -318,13 +348,13 @@ double kgAt(List<Wk> wk, int t) {
 int weekIdx(Profile p) => math.max(0, ((nowMs() - p.pStart) / (7 * dayMs)).floor());
 
 class PlanNow {
-  final int w, phase, exMin, fast;
-  PlanNow(this.w, this.phase, this.exMin, this.fast);
+  final int w, phase, exMin, fast, lvl, nextExMin;
+  PlanNow(this.w, this.phase, this.exMin, this.fast, this.lvl, this.nextExMin);
 }
 
 PlanNow planNow(Profile p) {
   final w = weekIdx(p);
-  return PlanNow(w, phaseOf(w), exMinOf(w, p), fastOf(w, p));
+  return PlanNow(w, phaseOf(w, paceOf(p)), exMinOf(w, p), fastOf(w, p), intensityOf(w, p), exMinOf(w + 1, p));
 }
 
 int addMonths(int t, int n) {
@@ -399,3 +429,166 @@ List<Badge> badges(AppData s, int stepsBestDay) {
     Badge('Level 5', lv >= 5),
   ];
 }
+
+// ---------- ideal weight ----------
+class IdealWeight {
+  final double bmiLow, bmiHigh, bmi22, devine, robinson, miller, hamwi;
+  final List<(String, double, String)> steps; // label, kg, why
+  IdealWeight(this.bmiLow, this.bmiHigh, this.bmi22, this.devine, this.robinson, this.miller, this.hamwi, this.steps);
+  double get formulaAvg => (devine + robinson + miller + hamwi) / 4;
+}
+
+IdealWeight idealWeight(double heightCm, String sex, double currentKg) {
+  final h2 = math.pow(heightCm / 100, 2).toDouble();
+  final inch = math.max(0, heightCm / 2.54 - 60);
+  final male = sex != 'f';
+  final devine = (male ? 50 : 45.5) + 2.3 * inch;
+  final robinson = (male ? 52 : 49) + (male ? 1.9 : 1.7) * inch;
+  final miller = (male ? 56.2 : 53.1) + (male ? 1.41 : 1.36) * inch;
+  final hamwi = (male ? 48 : 45.5) + (male ? 2.7 : 2.2) * inch;
+  final steps = <(String, double, String)>[];
+  void add(String l, double kg, String why) {
+    if (kg < currentKg - 0.5 && !steps.any((s) => (s.$2 - kg).abs() < 1.5)) steps.add((l, kg, why));
+  }
+
+  add('Turun 10%', currentKg * .9, 'Manfaat kesehatan terbesar datang dari 5–10% pertama: tekanan darah, gula darah, kolesterol.');
+  add('Keluar dari obesitas', (29.9 * h2 * 2).floor() / 2, 'BMI di bawah 30 menurunkan risiko diabetes tipe 2 dan penyakit jantung secara nyata.');
+  add('BMI 27', (27 * h2 * 2).round() / 2, 'Target antara yang realistis. Banyak orang bertahan lama di sini dengan pola makan normal.');
+  add('BMI normal', (24.9 * h2 * 2).floor() / 2, 'Batas atas BMI normal. Cukup untuk sebagian besar manfaat kesehatan.');
+  add('Ideal penuh · BMI 22', (22 * h2 * 2).round() / 2, 'Titik tengah rentang sehat. Opsional, terutama kalau kamu banyak latihan beban.');
+  steps.sort((a, b) => b.$2.compareTo(a.$2));
+  return IdealWeight(18.5 * h2, 24.9 * h2, 22 * h2, devine, robinson, miller, hamwi, steps);
+}
+
+// ---------- automatic exercise recommendation ----------
+class AutoPlan {
+  final int days, sess;
+  final String equip, why;
+  AutoPlan(this.days, this.sess, this.equip, this.why);
+}
+
+/// Picks training days and session length from BMI and daily activity.
+AutoPlan autoPlan(double kg, double heightCm, double act, String equip) {
+  final b = bmiOf(kg, heightCm);
+  if (b >= 35) {
+    return AutoPlan(5, 30, equip,
+        'BMI ${fmt1(b)}: sesi lebih pendek tapi sering (5 × 30 menit) lebih ramah sendi dan lebih mudah jadi kebiasaan. Naik bertahap sampai 150 menit/minggu di bulan ke-3, ditambah jalan kaki harian.');
+  }
+  if (b >= 30) {
+    return AutoPlan(5, 45, equip,
+        'BMI ${fmt1(b)}: untuk turun berat yang berarti, ACSM menyarankan lebih dari 250 menit/minggu. Mulai 60% dulu, naik ke 5 × 45 menit (225 menit) plus jalan kaki di bulan ke-3.');
+  }
+  if (b >= 25) {
+    return AutoPlan(4, 45, equip,
+        'BMI ${fmt1(b)}: 4 × 45 menit (180 menit/minggu) sudah di dalam saran WHO, cukup untuk turun berat bersama defisit kalori.');
+  }
+  return AutoPlan(3, 45, equip, 'BMI ${fmt1(b)}: fokus menjaga otot dan kebugaran, 3 × 45 menit dengan latihan beban.');
+}
+
+class Rec {
+  final String title, why;
+  final String? programId; // null = walk or rest
+  final int walkMin;
+  final bool rest;
+  Rec(this.title, this.why, {this.programId, this.walkMin = 0, this.rest = false});
+}
+
+/// Today's suggestion: follows the weekly schedule but adapts to what was
+/// actually done (no strength two days in a row, catch up a missed session,
+/// lighter day after a long fast).
+Rec recommendToday(AppData s, {List<int> steps7 = const []}) {
+  final p = s.profile;
+  final now = DateTime.now();
+  final phase = hasPlan(p) ? planNow(p).phase : _phaseFromHistory(s);
+  final types = sessionTypes(p, phase);
+  final dow = now.weekday - 1;
+  final exMin = hasPlan(p) ? planNow(p).exMin : exMinOf(_weeksActive(s), p);
+  final per = math.max(15, (exMin / p.days).round());
+  final today = ymd(now);
+  final yest = ymd(now.subtract(const Duration(days: 1)));
+  final doneToday = s.moves.where((m) => ymd(fromMs(m.t)) == today && m.kind != 'act').toList();
+  final strYest = s.moves.any((m) => ymd(fromMs(m.t)) == yest && m.kind == 'str');
+  final wm = weekMoves(s);
+  final strThisWeek = wm.where((m) => m.kind == 'str').map((m) => ymd(fromMs(m.t))).toSet().length;
+  final plannedStrSoFar = [for (var i = 0; i < dow; i++) types[i]].where((t) => t != null && t != 'p3' && t != 'walk').length;
+  final weekMin = wm.fold<int>(0, (a, m) => a + m.min);
+  final longFast = s.active != null && (nowMs() - s.active!.start) > 16 * hourMs;
+  final avgSteps = steps7.isEmpty ? 0 : (steps7.reduce((a, b) => a + b) / steps7.length).round();
+  final stepTip = avgSteps > 0 && avgSteps < 7000 ? ' Langkahmu rata-rata ${avgSteps ~/ 100 * 100}/hari, jalan kaki ini juga menambah langkah.' : '';
+
+  String strengthFor() {
+    final db = p.equip == 'db';
+    if (!db) return phase == 1 ? 'p1' : 'p2';
+    if (phase == 1) return 'p1';
+    final lastDb = s.moves.reversed.where((m) => m.name.startsWith('Dumbbell')).firstOrNull;
+    return lastDb != null && lastDb.name.startsWith('Dumbbell A') ? 'd2' : 'd1';
+  }
+
+  if (doneToday.isNotEmpty) {
+    return Rec('Latihan hari ini sudah selesai', 'Bagus! Sisanya cukup jalan santai dan minum air. Otot tumbuh saat istirahat.', rest: true);
+  }
+  var t = types[dow];
+  var why = 'Sesuai jadwal mingguanmu.';
+  final isStr = t != null && t != 'p3' && t != 'walk';
+  if (isStr && strYest) {
+    t = 'p3';
+    why = 'Kemarin sudah latihan otot, jadi hari ini kardio dulu supaya otot sempat pulih.';
+  } else if ((t == null || t == 'walk') && strThisWeek < plannedStrSoFar && !strYest) {
+    t = strengthFor();
+    why = 'Ada sesi latihan otot yang terlewat minggu ini. Kejar hari ini supaya tetap 2 hari otot per minggu.';
+  } else if (t == null && weekMin < exMin * dow / 7 - 20) {
+    t = 'walk';
+    why = 'Hari libur, tapi menit minggu ini masih tertinggal. Jalan cepat santai sudah cukup.';
+  }
+  if (t != null && t != 'p3' && t != 'walk') t = strengthFor();
+  if (longFast && t != null && t != 'walk' && t != 'p1') {
+    final prog = programs.firstWhere((x) => x.id == t);
+    return Rec('Hari ini: jalan cepat $per menit',
+        'Kamu sudah puasa lebih dari 16 jam. Latihan berat saat perut kosong lama bisa bikin pusing. Jalan cepat dulu, ${prog.name} setelah makan.',
+        walkMin: per);
+  }
+  if (t == null) {
+    return Rec('Hari ini: istirahat aktif', 'Jadwal libur. Jalan santai 10–15 menit tetap bagus untuk pemulihan.$stepTip', rest: true);
+  }
+  if (t == 'walk') return Rec('Hari ini: jalan cepat $per menit', '$why Catat di "Catat aktivitas lain" setelah selesai.$stepTip', walkMin: per);
+  final prog = programs.firstWhere((x) => x.id == t);
+  final extra = math.max(0, per - prog.minutesAt(currentLvl(s)));
+  return Rec('Hari ini: ${prog.name}${extra >= 5 ? ' + jalan $extra menit' : ''}', why, programId: prog.id, walkMin: extra >= 5 ? extra : 0);
+}
+
+int _weeksActive(AppData s) {
+  final first = [
+    if (s.moves.isNotEmpty) s.moves.first.t,
+    if (s.weights.isNotEmpty) s.weights.first.date.millisecondsSinceEpoch,
+  ];
+  if (first.isEmpty) return 0;
+  return math.max(0, ((nowMs() - first.reduce(math.min)) / (7 * dayMs)).floor());
+}
+
+int _phaseFromHistory(AppData s) => phaseOf(_weeksActive(s), paceOf(s.profile));
+
+/// Suggested daily step goal: a bit above the recent average, capped at 10k.
+int suggestedStepGoal(List<int> steps7) {
+  if (steps7.isEmpty) return 8000;
+  final avg = steps7.reduce((a, b) => a + b) / steps7.length;
+  return (((avg + 1000) / 500).round() * 500).clamp(5000, 10000).toInt();
+}
+
+/// Dumbbell progression hint per exercise based on how many sessions used the current load.
+String loadTip(AppData s, String exId) {
+  final r = ex[exId]!.range;
+  if (r == null) return '';
+  final kg = loadOf(s, exId);
+  if (kg < r[0]) return 'Masih di bawah saran awal. Naikkan kalau 12 repetisi terasa ringan.';
+  if (kg >= r[1]) return 'Sudah di batas atas saran. Tambah repetisi pelan atau waktu turun 3 detik sebelum menaikkan beban.';
+  return 'Kalau 12 repetisi masih tersisa 3+ repetisi lagi, naikkan 1–2 kg di sesi berikutnya.';
+}
+
+/// Current training intensity for the program player and cards.
+int currentLvl(AppData s) {
+  final p = s.profile;
+  if (hasPlan(p)) return planNow(p).lvl;
+  return intensityOf(_weeksActive(s), p);
+}
+
+String lvlTxt(int l) => const {1: 'Level 1', 2: 'Level 2 · istirahat lebih singkat', 3: 'Level 3 · set/putaran ditambah'}[l]!;
