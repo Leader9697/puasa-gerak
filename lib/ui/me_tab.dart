@@ -1,5 +1,6 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:shorebird_code_push/shorebird_code_push.dart';
 
 import '../cloud.dart';
 import '../data.dart';
@@ -65,6 +66,7 @@ class _MeTabState extends State<MeTab> {
         ], gap: 10),
       ),
       const _AccountCard(),
+      const _UpdateCard(),
       if (hasPlan(p)) const _PlanSettings(),
       Box(
         child: Col([
@@ -325,6 +327,83 @@ class _PlanSettingsState extends State<_PlanSettings> {
             toast(context, 'Rencana diperbarui');
           }),
       ]),
+    );
+  }
+}
+
+/// Over-the-air updates (Shorebird): shows the installed patch and lets the
+/// user fetch a new one right away instead of waiting for the next launch.
+class _UpdateCard extends StatefulWidget {
+  const _UpdateCard();
+  @override
+  State<_UpdateCard> createState() => _UpdateCardState();
+}
+
+class _UpdateCardState extends State<_UpdateCard> {
+  final _u = ShorebirdUpdater();
+  int? patch;
+  bool busy = false;
+  String msg = '';
+
+  @override
+  void initState() {
+    super.initState();
+    if (_u.isAvailable) {
+      _u.readCurrentPatch().then((p) {
+        if (mounted) setState(() => patch = p?.number);
+      }).catchError((_) {});
+    }
+  }
+
+  Future<void> _check() async {
+    setState(() {
+      busy = true;
+      msg = 'Memeriksa…';
+    });
+    String m;
+    try {
+      final st = await _u.checkForUpdate();
+      if (st == UpdateStatus.outdated) {
+        setState(() => msg = 'Mengunduh update…');
+        await _u.update();
+        m = 'Update terunduh. Tutup aplikasi sepenuhnya lalu buka lagi untuk memakainya.';
+      } else if (st == UpdateStatus.restartRequired) {
+        m = 'Update sudah terunduh. Tutup aplikasi sepenuhnya lalu buka lagi.';
+      } else if (st == UpdateStatus.upToDate) {
+        m = 'Sudah versi terbaru.';
+      } else {
+        m = 'Update otomatis belum aktif di versi ini.';
+      }
+    } catch (_) {
+      m = 'Gagal memeriksa update. Coba lagi saat ada internet.';
+    }
+    if (mounted) {
+      setState(() {
+        busy = false;
+        msg = m;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final on = _u.isAvailable;
+    return Box(
+      child: Col([
+        Row(children: [
+          const Icon(Icons.system_update_rounded, color: C.blue),
+          const SizedBox(width: 8),
+          const Expanded(child: H3('Update aplikasi')),
+          if (on) Pill(patch == null ? 'Versi dasar' : 'Update #$patch', color: C.blue),
+        ]),
+        Muted(
+            on
+                ? 'Update kecil masuk otomatis tanpa pasang APK: diunduh saat aplikasi dibuka, aktif saat dibuka berikutnya.'
+                : 'Update otomatis aktif mulai versi Shorebird.',
+            size: 12.5),
+        if (msg.isNotEmpty) Text(msg, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        if (on) Btn(busy ? 'Memeriksa…' : 'Cek update sekarang', small: true, ghost: true, onTap: busy ? null : _check),
+      ], gap: 8),
     );
   }
 }
