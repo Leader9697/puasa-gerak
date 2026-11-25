@@ -1,9 +1,12 @@
-// Looping stick-figure animation for each exercise (side view, facing right).
-// Each pose is a set of joint angles; frames are interpolated, so limbs move
-// naturally and the lowest body point always rests on the floor.
+// Looping 3D mannequin animation for each exercise, seen from a three-quarter
+// angle. Each pose is a set of joint angles in the side plane; the body is
+// built from shaded capsules and spheres, and the muscles the exercise trains
+// glow red (main) or orange (assisting).
 import 'dart:math' as math;
 
 import 'package:material_ui/material_ui.dart';
+
+import '../logic.dart' show ex;
 
 /// Angles in degrees: 0 = pointing down, 90 = forward (right), 180 = up, -90 = backward.
 class Pose {
@@ -136,23 +139,56 @@ class _ExerciseAnimState extends State<ExerciseAnim> with SingleTickerProviderSt
       height: widget.size,
       child: AnimatedBuilder(
         animation: _c,
-        builder: (_, _) => CustomPaint(painter: _FigurePainter(_a, _c.value, widget.color, dark)),
+        builder: (_, _) => CustomPaint(painter: _MannequinPainter(_a, _c.value, widget.color, dark, ex[widget.exId]?.m ?? const {})),
       ),
     );
   }
 }
 
-class _FigurePainter extends CustomPainter {
+
+const muscleMain = Color(0xFFFF3B30), muscleHelp = Color(0xFFFF9F0A);
+
+/// Small legend for the muscle colours.
+class MuscleLegend extends StatelessWidget {
+  final Color? textColor;
+  const MuscleLegend({super.key, this.textColor});
+  @override
+  Widget build(BuildContext context) {
+    Widget dot(Color c, String t) => Row(mainAxisSize: MainAxisSize.min, children: [
+          Container(width: 10, height: 10, decoration: BoxDecoration(color: c, shape: BoxShape.circle)),
+          const SizedBox(width: 5),
+          Text(t, style: TextStyle(fontSize: 12, color: textColor, fontWeight: FontWeight.w600)),
+        ]);
+    return Wrap(spacing: 14, runSpacing: 4, alignment: WrapAlignment.center, children: [dot(muscleMain, 'Otot utama'), dot(muscleHelp, 'Otot pembantu')]);
+  }
+}
+
+class _V {
+  final double x, y, z;
+  const _V(this.x, this.y, this.z);
+}
+
+class _Part {
+  final double depth;
+  final void Function() draw;
+  _Part(this.depth, this.draw);
+}
+
+class _MannequinPainter extends CustomPainter {
   final Anim a;
   final double t;
   final Color color;
   final bool dark;
-  _FigurePainter(this.a, this.t, this.color, this.dark);
+  final Map<String, double> m;
+  _MannequinPainter(this.a, this.t, this.color, this.dark, this.m);
+
+  static const _yaw = 32 * math.pi / 180;
+  static final _cos = math.cos(_yaw), _sin = math.sin(_yaw);
+  static const _shW = 8.0, _hipW = 5.2;
 
   Pose _pose() {
     final n = a.frames.length;
     if (n == 1) return a.frames.first;
-    // ping-pong through frames with ease in/out
     final x = t * 2 * (n - 1);
     final seg = x < (n - 1) ? x : 2 * (n - 1) - x;
     final i = seg.floor().clamp(0, n - 2);
@@ -161,89 +197,246 @@ class _FigurePainter extends CustomPainter {
     return a.frames[i].lerp(a.frames[i + 1], e.toDouble());
   }
 
+  // world (side-plane x/y plus sideways z) -> screen point and depth
+  Offset _p(_V v) => Offset(50 + (v.x - 50) * _cos - v.z * _sin, v.y);
+  double _d(_V v) => (v.x - 50) * _sin + v.z * _cos;
+  _V _w(Offset o, double z) => _V(o.dx, o.dy, z);
+
+  Color _heat(String k) {
+    final v = m[k] ?? 0;
+    if (v <= 0) return Colors.transparent;
+    final pulse = .72 + .28 * math.sin(t * 4 * math.pi);
+    return (v >= 1 ? muscleMain : muscleHelp).withValues(alpha: pulse);
+  }
+
+  Color get _skin => dark ? const Color(0xFF9AA8BF) : const Color(0xFFC3CEDE);
+
+  Color _mix(Color base, Color heat) => heat.a == 0 ? base : Color.lerp(base, heat.withValues(alpha: 1), heat.a * .85)!;
+
+  void _capsule(Canvas c, Offset p1, Offset p2, double r1, double r2, Color base) {
+    final d = p2 - p1;
+    final len = d.distance;
+    if (len < .01) {
+      _sphere(c, p1, math.max(r1, r2), base);
+      return;
+    }
+    final u = d / len, n = Offset(-u.dy, u.dx);
+    final path = Path()
+      ..moveTo((p1 + n * r1).dx, (p1 + n * r1).dy)
+      ..lineTo((p2 + n * r2).dx, (p2 + n * r2).dy)
+      ..arcToPoint(p2 - n * r2, radius: Radius.circular(r2), clockwise: true)
+      ..lineTo((p1 - n * r1).dx, (p1 - n * r1).dy)
+      ..arcToPoint(p1 + n * r1, radius: Radius.circular(r1), clockwise: true)
+      ..close();
+    // light comes from the upper left
+    final lightSide = (n.dx * -1 + n.dy * -1) > 0 ? 1.0 : -1.0;
+    final r = math.max(r1, r2);
+    final mid = (p1 + p2) / 2;
+    final hsl = HSLColor.fromColor(base);
+    final hi = hsl.withLightness((hsl.lightness + .18).clamp(0, 1)).toColor();
+    final lo = hsl.withLightness((hsl.lightness - .22).clamp(0, 1)).toColor();
+    c.drawPath(
+        path,
+        Paint()
+          ..shader = LinearGradient(colors: [hi, base, lo], stops: const [0, .45, 1])
+              .createShader(Rect.fromPoints(mid + n * r * lightSide, mid - n * r * lightSide)));
+  }
+
+  void _sphere(Canvas c, Offset o, double r, Color base) {
+    final hsl = HSLColor.fromColor(base);
+    final hi = hsl.withLightness((hsl.lightness + .2).clamp(0, 1)).toColor();
+    final lo = hsl.withLightness((hsl.lightness - .25).clamp(0, 1)).toColor();
+    c.drawCircle(
+        o,
+        r,
+        Paint()
+          ..shader = RadialGradient(center: const Alignment(-.4, -.45), radius: 1.05, colors: [hi, base, lo], stops: const [0, .5, 1])
+              .createShader(Rect.fromCircle(center: o, radius: r)));
+  }
+
+  void _glow(Canvas c, Offset o, double rx, double ry, double rot, Color heat, {bool hidden = false}) {
+    if (heat.a == 0) return;
+    c.save();
+    c.translate(o.dx, o.dy);
+    c.rotate(rot);
+    final rect = Rect.fromCenter(center: Offset.zero, width: rx * 2, height: ry * 2);
+    c.drawOval(
+        rect,
+        Paint()
+          ..shader = RadialGradient(colors: [heat.withValues(alpha: heat.a * (hidden ? .55 : .95)), heat.withValues(alpha: 0)], stops: const [.45, 1])
+              .createShader(rect));
+    c.restore();
+  }
+
   @override
   void paint(Canvas canvas, Size size) {
     final s = size.width / 100;
     canvas.save();
     canvas.scale(s);
     final b = _solve(_pose());
-    final propPaint = Paint()
-      ..color = (dark ? Colors.white : Colors.black).withValues(alpha: .22)
-      ..strokeWidth = 3
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    // floor
-    canvas.drawLine(const Offset(6, 93.5), const Offset(94, 93.5), propPaint..strokeWidth = 2);
-    propPaint.strokeWidth = 3;
     final first = _solve(a.frames.first);
+    final propCol = (dark ? Colors.white : const Color(0xFF3A4660)).withValues(alpha: dark ? .28 : .32);
+    final propPaint = Paint()
+      ..color = propCol
+      ..strokeWidth = 1.6
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round
+      ..style = PaintingStyle.stroke;
+    final propFill = Paint()..color = propCol.withValues(alpha: propCol.a * .45);
+
+    // floor and soft shadow
+    final feet = [b.f1, b.f2, b.hip].map((o) => o.dx).toList();
+    final fx = (feet.reduce(math.min) + feet.reduce(math.max)) / 2;
+    canvas.drawOval(Rect.fromCenter(center: _p(_V(fx, 93.5, 0)), width: 46, height: 7),
+        Paint()..color = (dark ? Colors.black : const Color(0xFF1B2440)).withValues(alpha: dark ? .35 : .12));
+
+    void quad(List<_V> q, {bool fill = true}) {
+      final path = Path()..moveTo(_p(q[0]).dx, _p(q[0]).dy);
+      for (final v in q.skip(1)) {
+        path.lineTo(_p(v).dx, _p(v).dy);
+      }
+      path.close();
+      if (fill) canvas.drawPath(path, propFill);
+      canvas.drawPath(path, propPaint);
+    }
+
+    void line(_V p1, _V p2) => canvas.drawLine(_p(p1), _p(p2), propPaint);
+
+    // props sit behind the body (drawn first)
     switch (a.prop) {
       case Prop.chair:
         final x = first.hip.dx - 6;
-        final seatY = math.max(first.hip.dy + 1, 70.0);
-        canvas.drawLine(Offset(x - 8, seatY), Offset(x + 10, seatY), propPaint);
-        canvas.drawLine(Offset(x - 8, seatY), Offset(x - 8, 93), propPaint);
-        canvas.drawLine(Offset(x + 10, seatY), Offset(x + 10, 93), propPaint);
-        canvas.drawLine(Offset(x - 8, seatY), Offset(x - 10, seatY - 22), propPaint);
+        final y = math.max(first.hip.dy + 1, 70.0);
+        quad([_V(x - 8, y, -8), _V(x + 10, y, -8), _V(x + 10, y, 8), _V(x - 8, y, 8)]);
+        for (final z in [-8.0, 8.0]) {
+          line(_V(x - 8, y, z), _V(x - 8, 93, z));
+          line(_V(x + 10, y, z), _V(x + 10, 93, z));
+        }
+        quad([_V(x - 8, y, -8), _V(x - 10, y - 22, -8), _V(x - 10, y - 22, 8), _V(x - 8, y, 8)]);
       case Prop.wall:
         final x = math.max(first.h1.dx, first.h2.dx) + 2;
-        canvas.drawLine(Offset(x, 10), Offset(x, 93), propPaint..strokeWidth = 4);
+        quad([_V(x, 8, -16), _V(x, 93, -16), _V(x, 93, 16), _V(x, 8, 16)]);
       case Prop.table:
         final x = math.max(first.h1.dx, first.h2.dx);
         final y = math.max(first.h1.dy, first.h2.dy) + 1;
-        canvas.drawLine(Offset(x - 12, y), Offset(x + 10, y), propPaint);
-        canvas.drawLine(Offset(x - 9, y), Offset(x - 9, 93), propPaint);
-        canvas.drawLine(Offset(x + 7, y), Offset(x + 7, 93), propPaint);
+        quad([_V(x - 12, y, -12), _V(x + 10, y, -12), _V(x + 10, y, 12), _V(x - 12, y, 12)]);
+        for (final z in [-12.0, 12.0]) {
+          line(_V(x - 9, y, z), _V(x - 9, 93, z));
+          line(_V(x + 7, y, z), _V(x + 7, 93, z));
+        }
       case Prop.none:
         break;
     }
-    final far = Paint()
-      ..color = color.withValues(alpha: .45)
-      ..strokeWidth = 5
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    final near = Paint()
-      ..color = color
-      ..strokeWidth = 5.5
-      ..strokeCap = StrokeCap.round
-      ..style = PaintingStyle.stroke;
-    void limb(Paint p, Offset a1, Offset a2, Offset a3) {
-      final path = Path()
-        ..moveTo(a1.dx, a1.dy)
-        ..lineTo(a2.dx, a2.dy)
-        ..lineTo(a3.dx, a3.dy);
-      canvas.drawPath(path, p..strokeJoin = StrokeJoin.round);
+
+    // body frame
+    final tv = b.neck - b.hip;
+    final tu = tv / tv.distance;
+    final front = Offset(-tu.dy, tu.dx); // chest side, in the side plane
+    final skin = _skin;
+    final parts = <_Part>[];
+
+    for (final side in [1.0, -1.0]) {
+      final near = side > 0;
+      final zs = _shW * side, zh = _hipW * side;
+      final sh = _w(b.neck + tu * -1.5, zs), el = _w(near ? b.e1 : b.e2, zs), ha = _w(near ? b.h1 : b.h2, zs);
+      final hp = _w(b.hip, zh), kn = _w(near ? b.k1 : b.k2, zh), ft = _w(near ? b.f1 : b.f2, zh);
+      final legHeat = _heat('kaki').a > 0 ? _heat('kaki') : _heat('pahaBlk');
+      final armHeat = _heat('lengan');
+      // leg: thigh, shin, foot
+      final shinU = (Offset(ft.x, ft.y) - Offset(kn.x, kn.y));
+      final su = shinU / math.max(.01, shinU.distance);
+      final toe = _V(ft.x + su.dy * 6.5, ft.y - su.dx * 6.5, zh);
+      parts.add(_Part((_d(hp) + _d(kn)) / 2, () {
+        _capsule(canvas, _p(hp), _p(kn), 4.4, 3.4, _mix(skin, legHeat));
+      }));
+      parts.add(_Part((_d(kn) + _d(ft)) / 2 - .01, () {
+        _capsule(canvas, _p(kn), _p(ft), 3.3, 2.4, _mix(skin, _heat('betis')));
+        _sphere(canvas, _p(kn), 3.4, _mix(skin, legHeat));
+      }));
+      parts.add(_Part(_d(ft) + .02, () {
+        _capsule(canvas, _p(ft), _p(toe), 2.6, 2.1, dark ? const Color(0xFF3B4558) : const Color(0xFF4A5670));
+      }));
+      // arm: upper arm, forearm, hand
+      parts.add(_Part((_d(sh) + _d(el)) / 2 + .05, () {
+        _capsule(canvas, _p(sh), _p(el), 2.9, 2.4, _mix(skin, armHeat));
+        _sphere(canvas, _p(sh), 3.5, _mix(skin, _heat('bahu')));
+      }));
+      parts.add(_Part((_d(el) + _d(ha)) / 2 + .06, () {
+        _capsule(canvas, _p(el), _p(ha), 2.4, 1.9, _mix(skin, armHeat.withValues(alpha: armHeat.a * .6)));
+        _sphere(canvas, _p(el), 2.5, _mix(skin, armHeat));
+        _sphere(canvas, _p(ha), 2.2, skin);
+      }));
     }
 
-    limb(far, b.hip, b.k2, b.f2);
-    limb(far, b.neck, b.e2, b.h2);
-    canvas.drawLine(b.hip, b.neck, near..strokeWidth = 7);
-    near.strokeWidth = 5.5;
-    limb(near, b.hip, b.k1, b.f1);
-    limb(near, b.neck, b.e1, b.h1);
-    canvas.drawCircle(b.head, _head, Paint()..color = color);
-
-    final dbPaint = Paint()..color = dark ? const Color(0xFFE9EDF5) : const Color(0xFF161A2B);
-    void dumbbell(Offset c, {bool vertical = false}) {
-      final d = vertical ? const Offset(0, 4) : const Offset(4, 0);
-      canvas.drawLine(c - d, c + d, Paint()
-        ..color = dbPaint.color
-        ..strokeWidth = 1.8);
-      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: c - d, width: vertical ? 6 : 3, height: vertical ? 3 : 6), const Radius.circular(1)), dbPaint);
-      canvas.drawRRect(RRect.fromRectAndRadius(Rect.fromCenter(center: c + d, width: vertical ? 6 : 3, height: vertical ? 3 : 6), const Radius.circular(1)), dbPaint);
-    }
-
-    if (a.db) {
-      if (a.oneDb) {
-        dumbbell(Offset.lerp(b.h1, b.h2, .5)!, vertical: true);
-      } else {
-        dumbbell(b.h2);
-        dumbbell(b.h1);
+    // torso (with chest/abs/back/glute glow) and head
+    final hipC = _w(b.hip, 0), neckC = _w(b.neck, 0);
+    parts.add(_Part(_d(hipC) * .5 + _d(neckC) * .5, () {
+      final shL = _p(_w(b.neck + tu * -1.5, _shW)), shR = _p(_w(b.neck + tu * -1.5, -_shW));
+      final hpL = _p(_w(b.hip, _hipW)), hpR = _p(_w(b.hip, -_hipW));
+      final body = Path()
+        ..moveTo(shL.dx, shL.dy)
+        ..lineTo(shR.dx, shR.dy)
+        ..lineTo(hpR.dx, hpR.dy)
+        ..lineTo(hpL.dx, hpL.dy)
+        ..close();
+      final hsl = HSLColor.fromColor(skin);
+      canvas.drawPath(body, Paint()
+        ..color = hsl.withLightness((hsl.lightness - .06).clamp(0, 1)).toColor()
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 8
+        ..strokeJoin = StrokeJoin.round);
+      canvas.drawPath(body, Paint()..color = hsl.withLightness((hsl.lightness - .06).clamp(0, 1)).toColor());
+      _capsule(canvas, _p(hipC), _p(_w(b.neck + tu * -2, 0)), 5.6, 6.6, skin);
+      // muscle glows in the side plane; front-facing ones are fully visible
+      final rot = math.atan2(tu.dy, tu.dx) + math.pi / 2;
+      final frontSeen = front.dx >= -.2; // chest turned toward the camera
+      for (final z in [3.6, -3.6]) {
+        _glow(canvas, _p(_w(b.neck + tu * -6 + front * 3.8, z)), 4.2, 3.6, rot, _heat('dada'), hidden: !frontSeen);
+        _glow(canvas, _p(_w(b.neck + tu * -9 + front * -3.8, z)), 4.0, 7.5, rot, _heat('punggung'), hidden: frontSeen);
+        _glow(canvas, _p(_w(b.hip + front * -3.6 + tu * 1, z * .9)), 4.2, 4.2, rot, _heat('bokong'), hidden: frontSeen);
       }
+      _glow(canvas, _p(_w(b.hip + tu * 10 + front * 4, 0)), 3.8, 7.5, rot, _heat('inti'), hidden: !frontSeen);
+      // neck and head
+      final headC = _w(b.head + tu * -1, 0);
+      _capsule(canvas, _p(neckC), _p(headC), 2.3, 2.3, skin);
+      _sphere(canvas, _p(headC), _head, skin);
+      // face direction: a small visor on the front of the head
+      final visor = _p(_w(b.head + tu * -1 + front * 4.2, 0));
+      canvas.drawCircle(visor, 1.6, Paint()..color = (dark ? Colors.white : const Color(0xFF2A3550)).withValues(alpha: .35));
+    }));
+
+    // dumbbells
+    if (a.db || a.dbHip) {
+      parts.add(_Part(99, () {
+        if (a.dbHip) {
+          _dumbbell(canvas, _w(b.hip + front * 2 + tu * 3, 0), vertical: false);
+        } else if (a.oneDb) {
+          final mid = Offset.lerp(b.h1, b.h2, .5)!;
+          _dumbbell(canvas, _w(mid, 0), vertical: true);
+        } else {
+          _dumbbell(canvas, _w(b.h2, -_shW), vertical: false);
+          _dumbbell(canvas, _w(b.h1, _shW), vertical: false);
+        }
+      }));
     }
-    if (a.dbHip) dumbbell(b.hip + const Offset(0, -4));
+
+    parts.sort((x, y) => x.depth.compareTo(y.depth));
+    for (final p in parts) {
+      p.draw();
+    }
     canvas.restore();
   }
 
+  void _dumbbell(Canvas c, _V h, {required bool vertical}) {
+    final metal = dark ? const Color(0xFFD5DBE6) : const Color(0xFF2B3245);
+    final a1 = vertical ? _V(h.x, h.y - 4.5, h.z) : _V(h.x, h.y, h.z + 4.5);
+    final a2 = vertical ? _V(h.x, h.y + 4.5, h.z) : _V(h.x, h.y, h.z - 4.5);
+    _capsule(c, _p(a1), _p(a2), .9, .9, metal);
+    for (final e in [a1, a2]) {
+      _sphere(c, _p(e), 2.8, metal);
+    }
+  }
+
   @override
-  bool shouldRepaint(_FigurePainter o) => o.t != t || o.a != a || o.color != color;
+  bool shouldRepaint(_MannequinPainter o) => o.t != t || o.a != a || o.color != color || o.dark != dark;
 }

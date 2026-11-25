@@ -95,4 +95,29 @@ void main() {
     final again = simulateFrom(d.profile, d.weights.last);
     expect(again.first.kg, 105.6);
   });
+
+  test('short fasts keep the streak and suggest a fitting target', () {
+    final d = AppData();
+    d.profile.plan = 20;
+    final now = nowMs();
+    for (var i = 1; i <= 5; i++) {
+      final end = now - i * dayMs;
+      d.fasts.add(Fast(end - 18 * hourMs, end, 20));
+    }
+    d.fasts.sort((a, b) => a.end.compareTo(b.end));
+    expect(d.fasts.first.done, isFalse);
+    expect(d.fasts.first.kept, isTrue);
+    expect(streaks(d).cur, 5);
+    final f = fastFit(d);
+    expect(f.suggest, 18);
+    // a 15 h fast against 20 h is not enough to keep the streak
+    expect(Fast(0, 15 * hourMs, 20).kept, isFalse);
+  });
+
+  test('dumbbell sessions pause to change the load between exercises', () {
+    final seq = programs.firstWhere((p) => p.id == 'd1').seq(1);
+    final swaps = seq.where((x) => x.swap).toList();
+    expect(swaps.length, 5); // before the first move + 4 changes
+    expect(swaps.skip(1).every((x) => x.sec >= 60), isTrue);
+  });
 }

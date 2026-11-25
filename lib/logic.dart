@@ -82,7 +82,7 @@ class Streaks {
 }
 
 Streaks streaks(AppData s) {
-  final days = s.fasts.where((f) => f.done).map((f) => ymd(fromMs(f.end))).toSet();
+  final days = s.fasts.where((f) => f.kept).map((f) => ymd(fromMs(f.end))).toSet();
   var cur = 0;
   var d = DateTime.now();
   if (!days.contains(ymd(d))) d = d.subtract(const Duration(days: 1));
@@ -116,7 +116,7 @@ List<Move> weekMoves(AppData s) {
 int xpOf(AppData s) {
   var x = 0;
   for (final f in s.fasts) {
-    x += f.done ? 50 : 15;
+    x += f.done ? 50 : (f.kept ? 35 : 15);
   }
   for (final m in s.moves) {
     x += (m.kind == 'act' ? 0 : 30) + (m.min ~/ 10) * 5;
@@ -275,16 +275,22 @@ class WStep {
   final int sec;
   final int? round, setOf;
   final bool easy;
-  const WStep(this.ex, this.sec, this.type, {this.round, this.setOf, this.easy = false});
+  final bool swap; // rest used to change the dumbbell load for the next exercise
+  const WStep(this.ex, this.sec, this.type, {this.round, this.setOf, this.easy = false, this.swap = false});
 }
 
 List<WStep> _sets(List<String> ids, int n, int work, int rest, int warm) {
   final seq = <WStep>[WStep('march', warm, 'warm')];
+  // time to pick up the dumbbell and set its load before the first exercise
+  if (ex[ids[0]]!.range != null) seq.add(WStep(ids[0], 45, 'rest', swap: true));
   for (var i = 0; i < ids.length; i++) {
     for (var k = 1; k <= n; k++) {
       seq.add(WStep(ids[i], work, 'work', round: k, setOf: n));
       final nx = k < n ? ids[i] : (i + 1 < ids.length ? ids[i + 1] : null);
-      if (nx != null) seq.add(WStep(nx, rest, 'rest'));
+      if (nx == null) continue;
+      // switching exercise with a different load: longer rest to adjust it
+      final swap = nx != ids[i] && ex[nx]!.range != null;
+      seq.add(WStep(nx, swap ? math.max(rest, 60) : rest, 'rest', swap: swap));
     }
   }
   seq.add(const WStep('stretch', 120, 'cool'));
@@ -887,4 +893,48 @@ List<Wk> simulateFrom(Profile p, Weight w, [String? pace]) {
   q.pKg = w.kg;
   q.pStart = DateTime.parse('${w.d}T00:00:00').millisecondsSinceEpoch;
   return simulate(pace ?? p.pace, q);
+}
+
+// ---------- how real fasts compare with the target ----------
+class FastFit {
+  final int n, short, long, target;
+  final double avg;
+  final int? suggest; // preset hours to switch to, if any
+  final String msg;
+  FastFit(this.n, this.avg, this.short, this.long, this.target, this.suggest, this.msg);
+}
+
+/// Looks at the last 7 fasts (within 14 days). Mostly short of target ->
+/// suggest a lower preset; mostly well past target -> say what that means.
+FastFit fastFit(AppData s) {
+  final target = s.profile.plan;
+  final from = nowMs() - 14 * dayMs;
+  final fs = s.fasts.where((f) => f.end >= from).toList();
+  final last = fs.length > 7 ? fs.sublist(fs.length - 7) : fs;
+  final n = last.length;
+  if (n == 0) return FastFit(0, 0, 0, 0, target, null, '');
+  final avg = last.fold<double>(0, (a, f) => a + f.hours) / n;
+  final short = last.where((f) => f.hours < f.target - 1).length;
+  final long = last.where((f) => f.hours >= f.target + 1.5).length;
+  final hrs = fmt1(avg);
+  if (n < 3) return FastFit(n, avg, short, long, target, null, '');
+  if (short * 2 > n) {
+    final fit = fastPlans.lastWhere((fp) => fp.h <= avg + .3, orElse: () => fastPlans.first);
+    final sug = fit.h < target ? fit.h : null;
+    return FastFit(n, avg, short, long, target, sug,
+        '$short dari $n puasa terakhir kurang dari target $target jam (rata-rata $hrs jam). '
+        '${sug != null ? 'Pakai ${fit.l} dulu sampai 2 minggu lancar, lalu naik lagi. ' : ''}'
+        'Penurunan berat tetap jalan selama kalori harian sesuai rencana.');
+  }
+  if (long * 2 > n) {
+    final over = avg >= 23;
+    final next = fastPlans.lastWhere((fp) => fp.h <= avg, orElse: () => fastPlans.last);
+    final sug = next.h > target ? next.h : null;
+    return FastFit(n, avg, short, long, target, sug,
+        'Rata-rata kamu puasa $hrs jam, di atas target $target jam. '
+        '${over ? 'Jangan lewat 24 jam tanpa pengawasan dokter. ' : ''}'
+        '${sug != null ? 'Kalau terasa ringan, target bisa dinaikkan ke ${next.l}. ' : ''}'
+        'Puasa lebih lama tidak membakar lemak ekstra, yang menentukan tetap total kalori, jadi pastikan protein cukup di jendela makan.');
+  }
+  return FastFit(n, avg, short, long, target, null, 'Rata-rata $hrs jam dari target $target jam. Pertahankan.');
 }

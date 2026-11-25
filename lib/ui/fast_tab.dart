@@ -194,6 +194,7 @@ class _FastTabState extends State<FastTab> {
           ...actions,
         ], gap: 10),
       ),
+      const _FitCard(),
       Box(
         child: Col([
           const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Eyebrow('Yang terjadi di tubuh'), H3('Fase puasa (gambaran umum)')]),
@@ -232,7 +233,14 @@ class _FastTabState extends State<FastTab> {
 
   void _end(BuildContext context) {
     final f = AppScope.read(context).endFast();
-    toast(context, f.done ? 'Mantap! Puasa ${fmt1(f.hours)} jam selesai. +50 XP' : 'Tercatat ${fmt1(f.hours)} jam. Besok coba lagi!');
+    final over = f.hours - f.target;
+    toast(
+        context,
+        f.done
+            ? (over >= 2 ? 'Puasa ${fmt1(f.hours)} jam, ${fmt1(over)} jam di atas target. +50 XP. Jangan lewat 24 jam.' : 'Mantap! Puasa ${fmt1(f.hours)} jam selesai. +50 XP')
+            : (f.kept
+                ? 'Puasa ${fmt1(f.hours)} jam dari target ${f.target}. Streak tetap jalan, +35 XP.'
+                : 'Tercatat ${fmt1(f.hours)} jam. Streak terputus, besok coba lagi!'));
   }
 }
 
@@ -319,11 +327,39 @@ class _History extends StatelessWidget {
                 first: i == 0,
                 title: Text(dlabel(list[i].end), style: const TextStyle(fontWeight: FontWeight.w700)),
                 sub: Muted('${hm(list[i].start)} → ${hm(list[i].end)} · target ${list[i].target} jam'),
-                trailing: [Pill('${fmt1(list[i].hours)} j', color: list[i].done ? pal.good : pal.warn)],
+                trailing: [Pill('${fmt1(list[i].hours)} j', color: list[i].done ? pal.good : (list[i].kept ? C.orange : pal.warn))],
                 onDelete: () => s.removeFast(list[i]),
               ),
           ]),
       ]),
+    );
+  }
+}
+
+/// Compares the last fasts with the target and offers a better-fitting preset.
+class _FitCard extends StatelessWidget {
+  const _FitCard();
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final f = fastFit(s.d);
+    if (f.msg.isEmpty) return const SizedBox.shrink();
+    final warn = f.suggest != null || f.avg >= 23;
+    return Box(
+      tint: tintOf(context, warn ? C.orange : C.green, .14),
+      child: Col([
+        Row(children: [
+          Icon(warn ? Icons.tune_rounded : Icons.check_circle_rounded, color: warn ? C.orange : C.green),
+          const SizedBox(width: 8),
+          Expanded(child: H3('${f.n} puasa terakhir · rata-rata ${fmt1(f.avg)} jam')),
+        ]),
+        Text(f.msg, style: const TextStyle(fontSize: 13.5, height: 1.4)),
+        if (f.suggest != null)
+          Btn('Pakai ${fastPlans.firstWhere((p) => p.h == f.suggest).l}', small: true, color: C.orange, onTap: () {
+            s.setPlan(f.suggest!);
+            toast(context, 'Target puasa jadi ${f.suggest} jam');
+          }),
+      ], gap: 8),
     );
   }
 }

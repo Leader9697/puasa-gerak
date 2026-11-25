@@ -338,6 +338,13 @@ class _TodayRec extends StatelessWidget {
         ]),
         Text(r.title, style: display(19, color: Pal.of(context).ink, w: FontWeight.w700)),
         Muted(r.why),
+        if (prog != null && prog.kind == 'str' && s.d.fasts.isNotEmpty && s.d.active == null)
+          Builder(builder: (_) {
+            final f = s.d.fasts.last;
+            if (f.hours < 18 || nowMs() - f.end > 90 * 60000) return const SizedBox.shrink();
+            return Text('Kamu baru selesai puasa ${fmt1(f.hours)} jam. Makan dulu, latihan beban 1–2 jam setelahnya.',
+                style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: C.orange));
+          }),
         if (prog != null) Btn('Mulai ${prog.name} (${prog.minutesAt(currentLvl(s.d))} menit)', color: col, onTap: () => startProgram(context, prog)),
         if (prog == null && r.walkMin > 0)
           Btn('Sudah jalan ${r.walkMin} menit, catat', color: col, onTap: () {

@@ -84,6 +84,9 @@ class Fast {
   int start, end, target;
   Fast(this.start, this.end, this.target);
   bool get done => (end - start) >= target * hourMs * 0.95;
+  /// Short of target but long enough to keep the habit (streak): at least
+  /// 80% of target and never under 13 hours.
+  bool get kept => done || hours >= (target * 0.8 < 13 ? 13 : target * 0.8);
   double get hours => (end - start) / hourMs;
   Map<String, dynamic> toJson() => {'start': start, 'end': end, 'target': target};
 }

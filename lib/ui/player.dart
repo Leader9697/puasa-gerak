@@ -114,7 +114,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
     final phase = switch (st.type) {
       'warm' => 'Pemanasan',
       'work' => 'Gerak${st.round != null ? (st.setOf != null ? ' · set ${st.round}/${st.setOf}' : ' · putaran ${st.round}') : ''}',
-      'rest' => st.easy ? 'Santai (jalan di tempat)' : 'Istirahat',
+      'rest' => st.easy ? 'Santai (jalan di tempat)' : (st.swap ? 'Ganti beban' : 'Istirahat'),
       _ => 'Pendinginan',
     };
     final tot = seq.fold<int>(0, (a, x) => a + x.sec);
@@ -142,7 +142,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   const Gap(10),
                   Meter(doneS / tot, color: col),
                   const Gap(14),
-                  Text(rest ? (st.easy ? 'Jalan santai' : 'Berikutnya: ${e.name}') : e.name, style: display(28)),
+                  Text(rest ? (st.easy ? 'Jalan santai' : (st.swap ? 'Siapkan ${fmtKg(loadOf(s.d, st.ex))} kg · ${e.name}' : 'Berikutnya: ${e.name}')) : e.name, style: display(st.swap ? 24 : 28)),
                   Expanded(
                     child: LayoutBuilder(builder: (c, cs) {
                       final side = (cs.maxHeight * .62).clamp(90.0, 240.0).clamp(0.0, cs.maxWidth);
@@ -157,15 +157,20 @@ class _PlayerScreenState extends State<PlayerScreen> {
                             size: side,
                           ),
                         ),
+                        Padding(padding: const EdgeInsets.only(top: 6), child: MuscleLegend(textColor: pal.muted)),
                         Flexible(
-                          child: FittedBox(
-                            child: Text('$left', style: display(110, color: rest ? pal.muted : col)),
-                          ),
+                          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+                            Flexible(child: FittedBox(child: Text('$left', style: display(110, color: rest ? pal.muted : col)))),
+                            if (rest && !st.easy) ...[
+                              const SizedBox(width: 12),
+                              Btn('+15 dtk', small: true, ghost: true, onTap: () => setState(() => left += 15)),
+                            ],
+                          ]),
                         ),
                       ]);
                     }),
                   ),
-                  _cue(context, rest && !st.easy ? 'Siapkan posisi' : 'Cara', [
+                  _cue(context, st.swap ? 'Atur beban, lalu siapkan posisi' : (rest && !st.easy ? 'Siapkan posisi' : 'Cara'), [
                     Text(e.how, style: const TextStyle(fontSize: 15)),
                     Muted(e.tip),
                     if (e.m.isNotEmpty) ...[
@@ -198,7 +203,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
                     Expanded(child: Btn(paused ? 'Lanjut' : 'Jeda', color: col, onTap: () => setState(() => paused = !paused))),
                     const SizedBox(width: 8),
                     Expanded(
-                        child: Btn('Lewati', ghost: true, onTap: () {
+                        child: Btn(rest && !st.easy ? 'Siap' : 'Lewati', ghost: true, onTap: () {
                       setState(() {
                         _record(true);
                         i++;

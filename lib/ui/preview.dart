@@ -27,7 +27,8 @@ class ProgramPreview extends StatelessWidget {
       final w = work[st.ex];
       work[st.ex] = (n: (w?.n ?? 0) + 1, sec: st.sec);
     }
-    final rests = seq.where((x) => x.type == 'rest').map((x) => x.sec).toList();
+    final rests = seq.where((x) => x.type == 'rest' && !x.swap).map((x) => x.sec).toList();
+    final swaps = seq.where((x) => x.swap).toList();
     final restSec = rests.isEmpty ? 0 : rests.reduce((a, b) => a < b ? a : b);
     final mus = program.musclesAt(lvl).entries.where((e) => e.value >= 1).toList()..sort((a, b) => b.value.compareTo(a.value));
     final circuit = seq.any((x) => x.type == 'work' && x.setOf == null && x.round != null);
@@ -86,6 +87,7 @@ class ProgramPreview extends StatelessWidget {
                         if (lvl > 1) Pill('Level $lvl'),
                       ]),
                       Muted(program.desc),
+                      const MuscleLegend(textColor: Colors.white),
                       if (mus.isNotEmpty) Text('Melatih: ${muscleList(mus.map((e) => e.key))}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
                     ], gap: 8),
                   ),
@@ -96,6 +98,8 @@ class ProgramPreview extends StatelessWidget {
                   section(
                       circuit ? 'Inti · $rounds putaran' : 'Inti',
                       restSec > 0 ? 'istirahat $restSec dtk antar ${circuit ? 'gerakan' : 'set'}' : ''),
+                  if (swaps.isNotEmpty)
+                    Muted('Sebelum ganti gerakan ada jeda ${swaps.last.sec} dtk untuk mengatur beban dumbbell. Tekan "+15 dtk" kalau butuh lebih lama, atau "Siap" kalau sudah.', size: 12.5),
                   for (final w in work.entries) row(w.key, circuit ? '${w.value.sec} dtk tiap putaran' : '${w.value.n} set × ${w.value.sec} dtk'),
                   if (cool.isNotEmpty) ...[
                     section('Pendinginan', dur(cool.fold(0, (a, x) => a + x.sec))),
