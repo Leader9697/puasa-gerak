@@ -1,5 +1,6 @@
 import 'package:material_ui/material_ui.dart';
 
+import 'cloud.dart';
 import 'data.dart';
 import 'logic.dart';
 import 'native.dart';
@@ -15,6 +16,7 @@ import 'ui/weight_tab.dart';
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Notifier.init();
+  await Cloud.init();
   final state = AppState();
   await state.init();
   runApp(PuasaGerakApp(state: state));
@@ -81,6 +83,7 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
       final s = AppScope.read(context);
       if (s.p.steps) s.refreshSteps();
       NativeBridge.sync(s.d);
+      if (Cloud.user != null) s.syncNow();
       setState(() {});
     }
   }

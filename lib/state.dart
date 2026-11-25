@@ -3,6 +3,7 @@ import 'dart:convert';
 
 import 'package:material_ui/material_ui.dart';
 
+import 'cloud.dart';
 import 'data.dart';
 import 'logic.dart';
 import 'native.dart';
@@ -15,6 +16,10 @@ class AppState extends ChangeNotifier {
   StepsStatus stepsStatus = StepsStatus.off;
   List<int> steps7 = [];
   int stepsBest = 0;
+  String syncText = '';
+  bool syncing = false;
+  int lastSync = 0;
+  Timer? _pushT;
 
   Profile get p => d.profile;
 
@@ -26,6 +31,7 @@ class AppState extends ChangeNotifier {
     unawaited(Notifier.sync(d));
     unawaited(NativeBridge.sync(d));
     if (p.steps) unawaited(refreshSteps());
+    if (Cloud.user != null) unawaited(syncNow());
   }
 
   void save({bool quiet = false}) {
@@ -33,7 +39,75 @@ class AppState extends ChangeNotifier {
     unawaited(Store.save(d));
     unawaited(Notifier.sync(d));
     unawaited(NativeBridge.sync(d));
+    if (Cloud.user != null) {
+      _pushT?.cancel();
+      _pushT = Timer(const Duration(seconds: 2), () => unawaited(_push()));
+    }
     if (!quiet) notifyListeners();
+  }
+
+  // ---- cloud ----
+  Future<void> _push() async {
+    final u = Cloud.user;
+    if (u == null) return;
+    try {
+      await Cloud.push(u.uid, d);
+      lastSync = nowMs();
+      syncText = '';
+    } catch (_) {
+      syncText = 'Belum tersinkron (offline). Data aman di HP dan akan dikirim lagi nanti.';
+    }
+    notifyListeners();
+  }
+
+  /// Pulls the cloud copy; the newer side wins.
+  Future<void> syncNow() async {
+    final u = Cloud.user;
+    if (u == null || syncing) return;
+    syncing = true;
+    notifyListeners();
+    try {
+      final r = await Cloud.pull(u.uid);
+      if (r != null && r.$2 > d.updatedAt) {
+        final keep = p;
+        d = r.$1;
+        d.updatedAt = r.$2;
+        d.profile
+          ..remind = keep.remind
+          ..steps = keep.steps;
+        await Store.save(d);
+        unawaited(Notifier.sync(d));
+        unawaited(NativeBridge.sync(d));
+      } else if (r == null || d.updatedAt > r.$2) {
+        if (d.updatedAt == 0) d.updatedAt = nowMs();
+        await Cloud.push(u.uid, d);
+      }
+      lastSync = nowMs();
+      syncText = '';
+    } catch (e) {
+      syncText = 'Gagal sinkron: ${e.toString().contains('permission') ? 'akses database ditolak, cek aturan Firestore' : 'tidak ada koneksi'}. Data tetap aman di HP.';
+    }
+    syncing = false;
+    notifyListeners();
+  }
+
+  Future<String?> signIn() async {
+    try {
+      await Cloud.signIn();
+      await syncNow();
+      return null;
+    } catch (e) {
+      final m = e.toString();
+      if (m.contains('canceled') || m.contains('cancelled')) return 'Login dibatalkan';
+      if (m.contains('operation-not-allowed')) return 'Login Google belum diaktifkan di Firebase (Authentication → Google)';
+      return 'Login gagal. Cek koneksi internet lalu coba lagi.';
+    }
+  }
+
+  Future<void> signOut() async {
+    await Cloud.signOut();
+    lastSync = 0;
+    notifyListeners();
   }
 
   ThemeMode get themeMode => p.theme == 'light' ? ThemeMode.light : (p.theme == 'dark' ? ThemeMode.dark : ThemeMode.system);

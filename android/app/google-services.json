@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "729875601065",
+    "project_id": "puasa-gerak",
+    "storage_bucket": "puasa-gerak.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:729875601065:android:8b52bb27c6db52f0413bb8",
+        "android_client_info": {
+          "package_name": "com.faris.puasa_gerak"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCz_PYSEDGuZJrHfdkRytyqHZUJtj1g5c4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

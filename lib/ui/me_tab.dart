@@ -1,6 +1,7 @@
 import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
+import '../cloud.dart';
 import '../logic.dart';
 import '../notify.dart';
 import '../state.dart';
@@ -61,6 +62,7 @@ class _MeTabState extends State<MeTab> {
           const Muted('Puasa selesai +50 XP, sesi olahraga +30 XP, tiap 10 menit aktivitas +5 XP, timbang badan +10 XP.'),
         ], gap: 10),
       ),
+      const _AccountCard(),
       Box(
         child: Col([
           const H3('Lencana'),
@@ -208,5 +210,50 @@ class _MeTabState extends State<MeTab> {
         ]),
       ),
     ]);
+  }
+}
+
+class _AccountCard extends StatelessWidget {
+  const _AccountCard();
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final u = Cloud.user;
+    if (!Cloud.ready) {
+      return const Box(child: Muted('Fitur akun belum tersedia di perangkat ini. Data tetap tersimpan di HP.'));
+    }
+    if (u == null) {
+      return Box(
+        tint: tintOf(context, C.blue),
+        child: Col([
+          const Row(children: [Icon(Icons.cloud_outlined, color: C.blue), SizedBox(width: 8), Expanded(child: H3('Simpan ke akun Google'))]),
+          const Muted('Masuk dengan Google supaya semua catatan tersimpan di cloud dan bisa dipulihkan kalau ganti HP. Tanpa login, data hanya ada di HP ini.'),
+          Btn('Masuk dengan Google', color: C.blue, onTap: () async {
+            final err = await s.signIn();
+            if (context.mounted) toast(context, err ?? 'Berhasil masuk. Data tersinkron.');
+          }),
+        ]),
+      );
+    }
+    final when = s.lastSync > 0 ? 'Terakhir sinkron ${hm(s.lastSync)}' : 'Belum sinkron di sesi ini';
+    return Box(
+      child: Col([
+        Row(children: [
+          const Icon(Icons.cloud_done, color: C.green),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text(u.displayName ?? 'Akun Google', style: const TextStyle(fontWeight: FontWeight.w700)),
+              Muted(u.email ?? '', size: 12.5),
+            ]),
+          ),
+        ]),
+        Muted(s.syncing ? 'Menyinkronkan…' : (s.syncText.isNotEmpty ? s.syncText : '$when. Setiap perubahan otomatis tersimpan ke cloud.'), size: 12.5),
+        Wrap(spacing: 8, runSpacing: 8, children: [
+          Btn('Sinkron sekarang', small: true, ghost: true, onTap: () => s.syncNow()),
+          Btn('Keluar', small: true, ghost: true, onTap: () => s.signOut()),
+        ]),
+      ], gap: 8),
+    );
   }
 }
