@@ -12,7 +12,20 @@
           "package_name": "com.faris.puasa_gerak"
         }
       },
-      "oauth_client": [],
+      "oauth_client": [
+        {
+          "client_id": "729875601065-rlljlb8tdrldbogrvhajrfap2tmkg62u.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.faris.puasa_gerak",
+            "certificate_hash": "a3eb35854d54484ebf7bbfef5676d510d8f3d22f"
+          }
+        },
+        {
+          "client_id": "729875601065-3bbubud43mvrtg806jm9jv8jbg41vd5a.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
       "api_key": [
         {
           "current_key": "AIzaSyCz_PYSEDGuZJrHfdkRytyqHZUJtj1g5c4"
@@ -20,7 +33,12 @@
       ],
       "services": {
         "appinvite_service": {
-          "other_platform_oauth_client": []
+          "other_platform_oauth_client": [
+            {
+              "client_id": "729875601065-3bbubud43mvrtg806jm9jv8jbg41vd5a.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
         }
       }
     }
