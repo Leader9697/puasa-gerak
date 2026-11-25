@@ -12,7 +12,7 @@ class Notifier {
   static final _p = FlutterLocalNotificationsPlugin();
   static bool _ready = false;
 
-  static const _idDone = 1, _idSoon = 2, _idEatEnd = 3, _idEatSoon = 4, _idOngoing = 10;
+  static const _idDone = 1, _idSoon = 2, _idEatEnd = 3, _idEatSoon = 4, _idWeighEve = 5, _idWeigh = 6, _idOngoing = 10;
 
   static Future<void> init() async {
     try {
@@ -67,10 +67,17 @@ class Notifier {
   static Future<void> sync(AppData s) async {
     if (!_ready) return;
     try {
-      for (final id in [_idDone, _idSoon, _idEatEnd, _idEatSoon, _idOngoing]) {
+      for (final id in [_idDone, _idSoon, _idEatEnd, _idEatSoon, _idWeighEve, _idWeigh, _idOngoing]) {
         await _p.cancel(id: id);
       }
       if (!s.profile.remind) return;
+      if (hasPlan(s.profile) && s.profile.lock > 0) {
+        final w = nextWeighWeek(s);
+        final t = weighAt(s.profile, w);
+        await _at(_idWeighEve, t - 10 * hourMs, 'Besok pagi jadwal timbang',
+            'Jam 06.00 setelah bangun dan buang air kecil. Malam ini hindari makanan sangat asin, makan besar, dan alkohol.');
+        await _at(_idWeigh, t, 'Waktunya timbang ⚖️', 'Sebelum makan dan minum. Catat beratmu di aplikasi supaya peta jalan ikut diperbarui.');
+      }
       final a = s.active;
       if (a != null) {
         // The live stopwatch notification is posted natively (see FastNotification.kt).

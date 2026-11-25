@@ -2,10 +2,12 @@ import 'package:flutter/services.dart';
 import 'package:material_ui/material_ui.dart';
 
 import '../cloud.dart';
+import '../data.dart';
 import '../logic.dart';
 import '../notify.dart';
 import '../state.dart';
 import 'common.dart';
+import 'plan_tab.dart';
 
 class MeTab extends StatefulWidget {
   const MeTab({super.key});
@@ -63,6 +65,7 @@ class _MeTabState extends State<MeTab> {
         ], gap: 10),
       ),
       const _AccountCard(),
+      if (hasPlan(p)) const _PlanSettings(),
       Box(
         child: Col([
           const H3('Lencana'),
@@ -254,6 +257,74 @@ class _AccountCard extends StatelessWidget {
           Btn('Keluar', small: true, ghost: true, onTap: () => s.signOut()),
         ]),
       ], gap: 8),
+    );
+  }
+}
+
+/// The only place a committed pace or the plan data can be changed.
+class _PlanSettings extends StatefulWidget {
+  const _PlanSettings();
+  @override
+  State<_PlanSettings> createState() => _PlanSettingsState();
+}
+
+class _PlanSettingsState extends State<_PlanSettings> {
+  bool open = false, editData = false;
+  String? pick;
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final p = s.p;
+    final pal = Pal.of(context);
+    final sel = pick ?? p.pace;
+    return Box(
+      child: Col([
+        Row(children: [
+          const Icon(Icons.flag_rounded, color: C.green),
+          const SizedBox(width: 8),
+          const Expanded(child: H3('Rencana')),
+          Pill(p.lock > 0 ? '${paces[p.pace]!.l} · terkunci' : paces[p.pace]!.l, color: C.green),
+        ]),
+        Muted(p.lock > 0
+            ? 'Dikunci sejak ${dfull(p.lock)}. Ubah hanya kalau benar-benar perlu, misalnya karena sakit atau jadwal berubah total.'
+            : 'Kecepatan belum dikunci. Pilih dan kunci di tab Rencana.', size: 12.5),
+        if (p.lock > 0 && !open) Btn('Ubah kecepatan', small: true, ghost: true, onTap: () => setState(() => open = true)),
+        if (open) ...[
+          Seg<String>(opts: [for (final k in paces.keys) (k, paces[k]!.l)], value: sel, onChanged: (v) => setState(() => pick = v)),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: pal.surface2, borderRadius: BorderRadius.circular(12)),
+            child: Text(
+                sel == p.pace
+                    ? 'Pilih kecepatan lain di atas.'
+                    : 'Rencana ${paces[sel]!.l} akan dihitung ulang mulai hari ini dari berat terakhir: target tercapai sekitar ${dfull((s.d.weights.isEmpty ? simulate(sel, p) : simulateFrom(p, Weight(todayStr(), s.d.weights.last.kg), sel)).last.t)}. Jadwal latihan dan timbang ikut menyesuaikan.',
+                style: const TextStyle(fontSize: 13, height: 1.4)),
+          ),
+          Row(children: [
+            Expanded(
+                child: Btn('Ya, ubah & kunci', small: true, color: C.green, onTap: sel == p.pace ? null : () {
+              s.changePace(sel);
+              setState(() {
+                open = false;
+                pick = null;
+              });
+              toast(context, 'Kecepatan diubah ke ${paces[sel]!.l} dan dikunci lagi');
+            })),
+            const SizedBox(width: 8),
+            Expanded(child: Btn('Batal', small: true, ghost: true, onTap: () => setState(() {
+              open = false;
+              pick = null;
+            }))),
+          ]),
+        ],
+        if (!editData)
+          Btn('Ubah data diri & rencana', small: true, ghost: true, onTap: () => setState(() => editData = true))
+        else
+          PlanForm(onSaved: () {
+            setState(() => editData = false);
+            toast(context, 'Rencana diperbarui');
+          }),
+      ]),
     );
   }
 }

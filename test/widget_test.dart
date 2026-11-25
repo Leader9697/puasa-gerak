@@ -78,4 +78,21 @@ void main() {
       }
     }
   });
+
+  test('pace locks and weigh-ins follow the plan', () {
+    final d = AppData();
+    d.profile
+      ..sex = 'm'
+      ..age = 35
+      ..pKg = 107
+      ..pStart = DateTime(2026, 11, 4).millisecondsSinceEpoch
+      ..lock = 1;
+    expect(fromMs(weighAt(d.profile, 3)).weekday, DateTime(2026, 11, 4).weekday);
+    expect(fromMs(weighAt(d.profile, 3)).hour, weighHour);
+    d.weights = [Weight(ymd(fromMs(weighAt(d.profile, 1))), 105.6)];
+    expect(weighLogged(d, 1)!.kg, 105.6);
+    expect(weighLogged(d, 2), isNull);
+    final again = simulateFrom(d.profile, d.weights.last);
+    expect(again.first.kg, 105.6);
+  });
 }

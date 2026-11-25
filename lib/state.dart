@@ -211,8 +211,25 @@ class AppState extends ChangeNotifier {
   }
 
   void setPace(String k) {
+    if (p.lock > 0) return; // committed: change only through settings
     p.pace = k;
     save();
+  }
+
+  /// Commits to the chosen pace. The plan restarts from today and the latest
+  /// weight, so every target and weigh-in date lines up from here on.
+  void lockPace() {
+    final n = DateTime.now();
+    p.lock = nowMs();
+    p.pStart = DateTime(n.year, n.month, n.day).millisecondsSinceEpoch;
+    if (d.weights.isNotEmpty) p.pKg = d.weights.last.kg;
+    save();
+  }
+
+  /// Deliberate change from settings: new pace, committed again from today.
+  void changePace(String k) {
+    p.pace = k;
+    lockPace();
   }
 
   // ---- settings / backup ----

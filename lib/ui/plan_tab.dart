@@ -43,6 +43,7 @@ class PlanTab extends StatelessWidget {
       status = diff.abs() < .5 ? 'Sesuai jadwal' : (diff < 0 ? 'Lebih cepat ${fmt1(-diff)} kg dari rencana' : 'Tertinggal ${fmt1(diff)} kg dari rencana');
     }
     final h2 = math.pow(p.height / 100, 2).toDouble();
+    final adj = (last != null && last.date.millisecondsSinceEpoch > p.pStart + 3 * dayMs && last.kg > p.goal) ? simulateFrom(p, last) : null;
 
     // key milestones
     final cand = <(double, String, bool)>[];
@@ -67,9 +68,10 @@ class PlanTab extends StatelessWidget {
       final eTxt = w0.exMin != row.exMin ? '${w0.exMin} → ${row.exMin}' : '${row.exMin}';
       final kg = kgAt(wk, tt);
       final now = nowMs();
+      final act = now >= tt ? _nearWeight(s.d.weights, tt) : null;
       months.add(_MonthRow(
         i: i, kg: kg, bmi: kg / h2, date: dfull(tt), tags: ['Puasa $fTxt', '±${kcal(row.intake)} kkal', 'Olahraga $eTxt mnt/mgg'],
-        lost: p.pKg - kg, isNow: now >= prevT && now < t, isPast: now >= t, end: reachedEnd, first: i == 1,
+        lost: p.pKg - kg, isNow: now >= prevT && now < t, isPast: now >= t, end: reachedEnd, first: i == 1, actual: act?.kg,
       ));
       if (reachedEnd) break;
     }
@@ -89,6 +91,15 @@ class PlanTab extends StatelessWidget {
             TextSpan(text: monthName(end.t), style: const TextStyle(fontWeight: FontWeight.w800)),
             TextSpan(text: ' (${dfull(end.t)}). Turun ${fmt1(lost)} kg, rata-rata ${fmt1(avg)} kg per minggu.'),
           ])),
+          if (adj != null)
+            Container(
+              padding: const EdgeInsets.all(10),
+              decoration: BoxDecoration(color: Colors.white.withValues(alpha: .16), borderRadius: BorderRadius.circular(12)),
+              child: Text(
+                  'Dari timbangan terakhir (${fmt1(last!.kg)} kg, ${dshort(last.d)}): perkiraan terbaru tercapai ${dfull(adj.last.t)}'
+                  '${(adj.last.t - end.t).abs() < 4 * dayMs ? ', sesuai rencana.' : (adj.last.t < end.t ? ', ${((end.t - adj.last.t) / (7 * dayMs)).round()} minggu lebih cepat.' : ', ${((adj.last.t - end.t) / (7 * dayMs)).round()} minggu lebih lambat.')}',
+                  style: const TextStyle(fontSize: 13, height: 1.4, fontWeight: FontWeight.w600)),
+            ),
           Row(children: [
             Expanded(child: Stat('Makan per hari', '±${kcal(cur.intake)}', sub: 'kkal')),
             const SizedBox(width: 10),
@@ -101,27 +112,8 @@ class PlanTab extends StatelessWidget {
           ]),
         ], gap: 10),
       ),
-      Box(
-        child: Col([
-          const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Eyebrow('Pilih kecepatan'), H3('Seberapa cepat mau turun?')]),
-          IntrinsicHeight(child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-            for (final k in paces.keys) ...[
-              if (k != 'santai') const SizedBox(width: 8),
-              Expanded(child: _PaceBtn(k: k, on: p.pace == k, wk: simulate(k, p), onTap: () => s.setPace(k))),
-            ],
-          ])),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(color: tintOf(context, C.blue), borderRadius: BorderRadius.circular(12)),
-            child: Col([
-              Text('Latihan untuk kecepatan ${paces[p.pace]!.l}', style: const TextStyle(fontWeight: FontWeight.w700)),
-              Muted(paces[p.pace]!.prog, size: 13),
-              _RampBars(p: p),
-            ], gap: 6),
-          ),
-          const Muted('Bedanya di kalori harian dan seberapa cepat latihan naik. "Cepat" lebih berat dijalani dan lebih rawan berhenti di tengah jalan. Yang paling bagus adalah kecepatan yang bisa kamu jalani terus.'),
-        ]),
-      ),
+      const _WeighCard(),
+      const _PaceCard(),
       Box(
         child: Col([
           const H3('Proyeksi berat'),
@@ -159,7 +151,7 @@ class PlanTab extends StatelessWidget {
           Column(children: months),
         ]),
       ),
-      form,
+      const Muted('Mau ubah kecepatan atau data diri? Buka menu Saya → Rencana.', size: 12.5),
       const Note('Cara menghitungnya', [
         'Kebutuhan kalori dihitung ulang tiap minggu dari berat terbaru. Makin ringan badan, makin kecil kebutuhannya, jadi penurunan melambat di akhir. Itu normal.',
         'Asumsi: defisit sekitar 7.700 kkal untuk 1 kg lemak. Olahraga dihitung sekitar 5 MET.',
@@ -169,6 +161,206 @@ class PlanTab extends StatelessWidget {
       ]),
     ]);
   }
+}
+
+Weight? _nearWeight(List<Weight> ws, int t) {
+  Weight? best;
+  var bd = 4 * dayMs;
+  for (final w in ws) {
+    final d = (w.date.millisecondsSinceEpoch - t).abs();
+    if (d <= bd) {
+      bd = d;
+      best = w;
+    }
+  }
+  return best;
+}
+
+class _PaceCard extends StatefulWidget {
+  const _PaceCard();
+  @override
+  State<_PaceCard> createState() => _PaceCardState();
+}
+
+class _PaceCardState extends State<_PaceCard> {
+  bool confirm = false;
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final p = s.p;
+    final locked = p.lock > 0;
+    final info = Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(color: tintOf(context, C.blue), borderRadius: BorderRadius.circular(12)),
+      child: Col([
+        Text('Latihan untuk kecepatan ${paces[p.pace]!.l}', style: const TextStyle(fontWeight: FontWeight.w700)),
+        Muted(paces[p.pace]!.prog, size: 13),
+        _RampBars(p: p),
+      ], gap: 6),
+    );
+    if (locked) {
+      return Box(
+        child: Col([
+          Row(children: [
+            const Icon(Icons.lock_rounded, color: C.green, size: 20),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Eyebrow('Komitmen'),
+                H3('Kecepatan ${paces[p.pace]!.l}'),
+              ]),
+            ),
+            Pill('sejak ${dfull(p.lock)}', color: C.green),
+          ]),
+          Muted('Puasa, kalori, latihan, dan jadwal timbang semuanya mengikuti kecepatan ini. Untuk mengubahnya, buka Saya → Rencana.', size: 13),
+          info,
+        ]),
+      );
+    }
+    return Box(
+      child: Col([
+        const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Eyebrow('Pilih kecepatan'), H3('Seberapa cepat mau turun?')]),
+        IntrinsicHeight(
+            child: Row(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+          for (final k in paces.keys) ...[
+            if (k != 'santai') const SizedBox(width: 8),
+            Expanded(child: _PaceBtn(k: k, on: p.pace == k, wk: simulate(k, p), onTap: () => setState(() {
+              confirm = false;
+              s.setPace(k);
+            }))),
+          ],
+        ])),
+        info,
+        const Muted('Bedanya di kalori harian dan seberapa cepat latihan naik. "Cepat" lebih berat dijalani dan lebih rawan berhenti di tengah jalan. Pilih yang bisa kamu jalani terus.'),
+        if (!confirm)
+          Btn('Kunci kecepatan ${paces[p.pace]!.l}', color: C.green, onTap: () => setState(() => confirm = true))
+        else
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(color: tintOf(context, C.green, .2), borderRadius: BorderRadius.circular(12)),
+            child: Col([
+              Text('Komit ke kecepatan ${paces[p.pace]!.l}?', style: const TextStyle(fontWeight: FontWeight.w700)),
+              const Muted('Setelah dikunci, pilihan ini tidak bisa diubah dari sini. Rencana dihitung ulang mulai hari ini dari berat terakhirmu, dan jadwal timbang mingguan dimulai.', size: 13),
+              Row(children: [
+                Expanded(child: Btn('Ya, kunci', color: C.green, onTap: () {
+                  s.lockPace();
+                  toast(context, 'Kecepatan ${paces[p.pace]!.l} dikunci. Semangat!');
+                })),
+                const SizedBox(width: 8),
+                Expanded(child: Btn('Batal', ghost: true, onTap: () => setState(() => confirm = false))),
+              ]),
+            ]),
+          ),
+      ]),
+    );
+  }
+}
+
+class _WeighCard extends StatefulWidget {
+  const _WeighCard();
+  @override
+  State<_WeighCard> createState() => _WeighCardState();
+}
+
+class _WeighCardState extends State<_WeighCard> {
+  final kg = TextEditingController();
+  bool rules = false;
+  @override
+  void dispose() {
+    kg.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final p = s.p;
+    final pal = Pal.of(context);
+    if (p.lock == 0) return const SizedBox.shrink();
+    final wk = simulate(p.pace, p);
+    final nw = nextWeighWeek(s.d);
+    final t = weighAt(p, nw);
+    final isToday = ymd(fromMs(t)) == todayStr();
+    final target = kgAt(wk, t);
+    final rows = <Widget>[];
+    for (var w = math.max(1, nw - 3); w <= nw + 2; w++) {
+      final at = weighAt(p, w);
+      final tg = kgAt(wk, at);
+      final got = weighLogged(s.d, w);
+      final past = w < nw;
+      rows.add(Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(children: [
+          SizedBox(width: 70, child: Text('Mgg $w', style: TextStyle(fontSize: 13, fontWeight: w == nw ? FontWeight.w800 : FontWeight.w600))),
+          Expanded(child: Text(dlabel(at), style: TextStyle(fontSize: 13, color: pal.muted))),
+          SizedBox(width: 72, child: Text('${fmt1(tg)} kg', textAlign: TextAlign.right, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+          SizedBox(
+            width: 92,
+            child: Text(
+              got != null ? '${fmt1(got.kg)} ${got.kg <= tg + .3 ? '✓' : '(+${fmt1(got.kg - tg)})'}' : (past ? 'terlewat' : (w == nw ? 'berikutnya' : '')),
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                  fontSize: 12.5,
+                  fontWeight: FontWeight.w700,
+                  color: got != null ? (got.kg <= tg + .3 ? pal.good : C.orange) : (w == nw ? C.purple : pal.muted)),
+            ),
+          ),
+        ]),
+      ));
+    }
+    return Box(
+      tint: tintOf(context, C.purple, .14),
+      child: Col([
+        Row(children: [
+          const Icon(Icons.monitor_weight_outlined, color: C.purple),
+          const SizedBox(width: 8),
+          const Expanded(child: H3('Jadwal timbang')),
+          Pill(isToday ? 'Hari ini' : hari[fromMs(t).weekday % 7], color: C.purple),
+        ]),
+        Text.rich(TextSpan(style: const TextStyle(height: 1.4), children: [
+          TextSpan(text: isToday ? 'Hari ini' : dlabel(t), style: const TextStyle(fontWeight: FontWeight.w800)),
+          TextSpan(text: ', jam ${two(weighHour)}.00 · target '),
+          TextSpan(text: '${fmt1(target)} kg', style: const TextStyle(fontWeight: FontWeight.w800)),
+          const TextSpan(text: '. Setiap minggu di hari yang sama. Hasilnya otomatis memperbarui peta jalan.'),
+        ])),
+        if (isToday)
+          Row(children: [
+            Expanded(
+                child: TextField(
+                    controller: kg,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                    decoration: const InputDecoration(labelText: 'Berat pagi ini (kg)'))),
+            const SizedBox(width: 8),
+            Btn('Catat', color: C.purple, onTap: () {
+              final v = double.tryParse(kg.text.trim().replaceAll(',', '.')) ?? 0;
+              if (v < 30 || v > 300) return toast(context, 'Isi berat yang valid');
+              s.saveWeight(todayStr(), v);
+              kg.clear();
+              FocusScope.of(context).unfocus();
+              toast(context, v <= target + .3 ? 'Tercatat. Sesuai target, mantap!' : 'Tercatat. Selisih ${fmt1(v - target)} kg dari target, tetap jalan.');
+            }),
+          ]),
+        Column(children: rows),
+        InkWell(
+          onTap: () => setState(() => rules = !rules),
+          child: Row(children: [
+            Expanded(child: Text('Aturan timbang (wajib dan jangan)', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5, color: C.purple))),
+            Icon(rules ? Icons.expand_less : Icons.expand_more, color: C.purple),
+          ]),
+        ),
+        if (rules) ...[
+          for (final r in weighDo) _rule(context, Icons.check_circle_rounded, pal.good, r),
+          for (final r in weighDont) _rule(context, Icons.cancel_rounded, C.orange, r),
+        ],
+      ], gap: 8),
+    );
+  }
+
+  Widget _rule(BuildContext c, IconData i, Color col, String t) => Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Icon(i, size: 18, color: col),
+        const SizedBox(width: 6),
+        Expanded(child: Text(t, style: const TextStyle(fontSize: 13, height: 1.4))),
+      ]);
 }
 
 class _PaceBtn extends StatelessWidget {
@@ -212,8 +404,9 @@ class _MonthRow extends StatelessWidget {
   final String date;
   final List<String> tags;
   final bool isNow, isPast, end, first;
+  final double? actual;
   const _MonthRow({required this.i, required this.kg, required this.bmi, required this.date, required this.tags, required this.lost,
-      required this.isNow, required this.isPast, required this.end, required this.first});
+      required this.isNow, required this.isPast, required this.end, required this.first, this.actual});
   @override
   Widget build(BuildContext context) {
     final pal = Pal.of(context);
@@ -238,6 +431,9 @@ class _MonthRow extends StatelessWidget {
               TextSpan(text: '${fmt1(kg)} kg', style: const TextStyle(fontWeight: FontWeight.w800)),
               TextSpan(text: ' · BMI ${fmt1(bmi)} · $date', style: TextStyle(fontSize: 12.5, color: pal.muted)),
             ])),
+            if (actual != null)
+              Text('Aktual ${fmt1(actual!)} kg · ${actual! <= kg + .3 ? 'sesuai target ✓' : 'kurang ${fmt1(actual! - kg)} kg'}',
+                  style: TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700, color: actual! <= kg + .3 ? pal.good : C.orange)),
             const SizedBox(height: 4),
             Wrap(spacing: 4, runSpacing: 4, children: [
               for (final t in tags)

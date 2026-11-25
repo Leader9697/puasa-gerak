@@ -39,6 +39,7 @@ class Profile {
   int pStart = 0;
   double pKg = 0;
   String equip = 'none';
+  int lock = 0; // when the pace was committed (0 = not yet)
   // native-only
   bool remind = true;
   bool steps = false;
@@ -47,7 +48,7 @@ class Profile {
   Map<String, dynamic> toJson() => {
         'height': height, 'goal': goal, 'weeklyMin': weeklyMin, 'plan': plan, 'theme': theme,
         'sex': sex, 'age': age, 'act': act, 'pace': pace, 'days': days, 'sess': sess, 'exp': exp,
-        'pStart': pStart, 'pKg': pKg, 'equip': equip, 'remind': remind, 'steps': steps, 'stepGoal': stepGoal,
+        'pStart': pStart, 'pKg': pKg, 'equip': equip, 'lock': lock, 'remind': remind, 'steps': steps, 'stepGoal': stepGoal,
       };
 
   static Profile from(Map<String, dynamic>? p) {
@@ -71,6 +72,7 @@ class Profile {
     b.pStart = _n(p['pStart'], 0).round();
     b.pKg = _n(p['pKg'], 0);
     b.equip = p['equip'] == 'db' ? 'db' : 'none';
+    b.lock = _n(p['lock'], 0).round();
     b.remind = p['remind'] != false;
     b.steps = p['steps'] == true;
     b.stepGoal = _n(p['stepGoal'], 8000).round().clamp(1000, 30000);

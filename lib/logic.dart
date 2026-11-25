@@ -829,3 +829,62 @@ int currentLvl(AppData s) {
 }
 
 String lvlTxt(int l) => const {1: 'Level 1', 2: 'Level 2 · istirahat lebih singkat', 3: 'Level 3 · set/putaran ditambah'}[l]!;
+
+// ---------- weigh-in schedule ----------
+/// Weigh once a week, same weekday as the plan start, right after waking.
+const weighHour = 6;
+
+/// Scheduled weigh-in moments (06.00 on the plan's weekday), week 0 first.
+int weighAt(Profile p, int w) {
+  final d = fromMs(p.pStart);
+  return DateTime(d.year, d.month, d.day + 7 * w, weighHour).millisecondsSinceEpoch;
+}
+
+/// Week index of the next weigh-in that still needs doing (today counts
+/// until a weight for today is logged).
+int nextWeighWeek(AppData s) {
+  final p = s.profile;
+  final now = DateTime.now();
+  final today0 = DateTime(now.year, now.month, now.day).millisecondsSinceEpoch;
+  var w = 0;
+  while (weighAt(p, w) < today0) {
+    w++;
+  }
+  final t = weighAt(p, w);
+  if (ymd(fromMs(t)) == todayStr() && s.weights.any((x) => x.d == todayStr())) w++;
+  return w;
+}
+
+/// The weight logged for weigh-in [w] (same day, or one day either side).
+Weight? weighLogged(AppData s, int w) {
+  final t = weighAt(s.profile, w);
+  final days = [for (final k in [0, -1, 1]) ymd(fromMs(t + k * dayMs))];
+  for (final d in days) {
+    for (final x in s.weights) {
+      if (x.d == d) return x;
+    }
+  }
+  return null;
+}
+
+const weighDo = [
+  'Jam 06.00, setelah bangun tidur dan buang air kecil.',
+  'Sebelum makan, minum (termasuk air putih), dan kopi.',
+  'Pakaian minimal yang sama setiap kali, timbangan di lantai keras yang rata.',
+  'Cukup sekali timbang per minggu di hari yang sama. Angka harian naik turun 1–2 kg karena air.',
+];
+const weighDont = [
+  'Malam sebelumnya: hindari makanan sangat asin, makan besar setelah jam 20.00, dan alkohol. Semuanya menahan air.',
+  'Jangan olahraga, sauna, atau mandi air panas sebelum timbang.',
+  'Jangan timbang setelah begadang atau saat sakit. Geser ke besok paginya.',
+  'Jangan menahan minum malamnya supaya angka turun. Itu hanya air dan bikin data tidak jujur.',
+];
+
+/// Re-projects the plan from the latest weigh-in, so the roadmap follows the
+/// real weight instead of the original guess.
+List<Wk> simulateFrom(Profile p, Weight w, [String? pace]) {
+  final q = Profile.from(p.toJson());
+  q.pKg = w.kg;
+  q.pStart = DateTime.parse('${w.d}T00:00:00').millisecondsSinceEpoch;
+  return simulate(pace ?? p.pace, q);
+}
