@@ -118,6 +118,31 @@ class Move {
 
 const exKeys = ['goblet', 'floorpress', 'row1', 'rdl', 'carry', 'sumo', 'ohp', 'row2', 'dbbridge', 'curl', 'splitsquat', 'gobletfull', 'bulgarian', 'hipthrust', 'ohps'];
 
+/// The user's adjustable dumbbells: a handle plus plates added in pairs
+/// (one on each side). [plates] counts plates of each size for ONE dumbbell.
+class Gear {
+  double handle = 1.5;
+  int count = 2; // dumbbells owned
+  Map<String, int> plates = {'2.5': 4, '2': 4, '1.5': 4};
+  Map<String, dynamic> toJson() => {'handle': handle, 'count': count, 'plates': plates};
+  static Gear from(dynamic o) {
+    final g = Gear();
+    if (o is! Map) return g;
+    final h = _n(o['handle'], 1.5);
+    if (h > 0 && h <= 10) g.handle = h;
+    g.count = _n(o['count'], 2).round() == 1 ? 1 : 2;
+    if (o['plates'] is Map) {
+      final pl = <String, int>{};
+      (o['plates'] as Map).forEach((k, v) {
+        final n = _n(v, 0).round();
+        if (k is String && double.tryParse(k) != null && n >= 0 && n <= 20) pl[k] = n;
+      });
+      g.plates = pl;
+    }
+    return g;
+  }
+}
+
 class AppData {
   int updatedAt = 0;
   Profile profile = Profile();
@@ -127,12 +152,13 @@ class AppData {
   List<Weight> weights = [Weight(todayStr(), 107)];
   List<Move> moves = [];
   Map<String, int> down = {}; // ladder steps the user chose to go back
+  Gear gear = Gear();
 
   Map<String, dynamic> toJson() => {
         'v': 1, 'updatedAt': updatedAt, 'profile': profile.toJson(), 'loads': loads,
         'active': active?.toJson(), 'fasts': fasts.map((e) => e.toJson()).toList(),
         'weights': weights.map((e) => e.toJson()).toList(), 'moves': moves.map((e) => e.toJson()).toList(),
-        'down': down,
+        'down': down, 'gear': gear.toJson(),
       };
 
   static AppData from(dynamic o) {
@@ -166,6 +192,7 @@ class AppData {
         if (exKeys.contains(k) && x > 0 && x <= 30) b.loads[k as String] = x;
       });
     }
+    b.gear = Gear.from(o['gear']);
     if (o['down'] is Map) {
       (o['down'] as Map).forEach((k, v) {
         final x = _n(v, 0).round();

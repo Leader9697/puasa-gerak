@@ -276,10 +276,10 @@ class _Schedule extends StatelessWidget {
     final s = AppScope.of(context);
     final p = s.p;
     final pn = planNow(p);
-    final types = sessionTypes(p, pn.phase);
+    final types = sessionTypes(p, pn.phase, pn.w);
     final dow = DateTime.now().weekday - 1;
     const names = {
-      'd1': ('DB A', C.blue), 'd2': ('DB B', C.blue), 'p1': ('Ringan', C.blue), 'p2': ('Kekuatan', C.blue),
+      'd1': ('DB A', C.blue), 'd2': ('DB B', C.blue), 'd3': ('DB C', C.blue), 'p1': ('Ringan', C.blue), 'p2': ('Kekuatan', C.blue),
       'p3': ('Kardio', C.red), 'walk': ('Jalan', C.green),
     };
     final doneDays = weekMoves(s.d).map((m) => fromMs(m.t).weekday - 1).toSet();

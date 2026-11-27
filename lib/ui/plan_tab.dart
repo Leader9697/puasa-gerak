@@ -91,6 +91,13 @@ class PlanTab extends StatelessWidget {
             TextSpan(text: monthName(end.t), style: const TextStyle(fontWeight: FontWeight.w800)),
             TextSpan(text: ' (${dfull(end.t)}). Turun ${fmt1(lost)} kg, rata-rata ${fmt1(avg)} kg per minggu.'),
           ])),
+          Builder(builder: (_) {
+            final real = simulate(p.pace, p, adh: .75);
+            return Text(
+                'Angka di atas kalau rencana dijalankan penuh setiap hari. Kenyataannya hampir tidak ada yang 100%, dan di studi diet, kepatuhan adalah penentu hasil terbesar (Dansinger dkk., JAMA 2005). '
+                'Kalau rata-rata 75% patuh, target tercapai sekitar ${monthName(real.last.t)} (${durText(real)}). Rumus sudah memperhitungkan metabolisme yang melambat saat berat turun dan kalori olahraga yang sebagian "dimakan lagi".',
+                style: const TextStyle(fontSize: 12.5, height: 1.4));
+          }),
           if (adj != null)
             Container(
               padding: const EdgeInsets.all(10),

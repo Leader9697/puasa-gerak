@@ -153,7 +153,77 @@ void main() {
   test('dumbbell sessions pause to change the load between exercises', () {
     final seq = programs.firstWhere((p) => p.id == 'd1').seq(1);
     final swaps = seq.where((x) => x.swap).toList();
-    expect(swaps.length, 5); // before the first move + 4 changes
+    expect(swaps.length, 4); // before the first move + 3 changes (deadbug has no load)
     expect(swaps.skip(1).every((x) => x.sec >= 60), isTrue);
   });
+
+  test('strength sets count reps, one-side moves run right then left', () {
+    syncLadder(AppData());
+    final d1 = programs.firstWhere((p) => p.id == 'd1').seq(1);
+    final goblet = d1.firstWhere((x) => x.ex == 'goblet' && x.type == 'work');
+    expect(goblet.reps, 10);
+    final row = d1.where((x) => x.ex == 'row1' && x.type == 'work').toList();
+    expect(row.length, 6); // 3 sets x 2 sides
+    expect(row.take(2).map((x) => x.side), ['kanan', 'kiri']);
+    // one side does not count as an extra set
+    expect(programs.firstWhere((p) => p.id == 'd1').musclesAt(1)['punggung'], 3);
+    // cardio intervals stay timed
+    expect(programs.firstWhere((p) => p.id == 'p3').seq(1).where((x) => x.type == 'work').every((x) => x.reps == null), isTrue);
+    // a single dumbbell turns two-hand moves into one arm at a time
+    final one = AppData()..gear.count = 1;
+    syncLadder(one);
+    expect(programs.firstWhere((p) => p.id == 'd1').seq(1).where((x) => x.ex == 'floorpress' && x.type == 'work').first.side, 'kanan');
+    syncLadder(AppData());
+  });
+
+  test('each dumbbell day has one leg pattern and days rotate A B C', () {
+    const legs = {'goblet', 'gobletfull', 'rdl', 'splitsquat', 'bulgarian', 'sitstand', 'squat', 'rlunge', 'sumo', 'dbbridge', 'hipthrust'};
+    for (final p in programs.where((p) => p.db)) {
+      for (final l in [1, 2, 3]) {
+        expect(p.exIdsAt(l).where(legs.contains).length, 1, reason: '${p.id} L$l');
+      }
+    }
+    final p = Profile()
+      ..equip = 'db'
+      ..days = 4;
+    final w0 = sessionTypes(p, 2, 0).whereType<String>().where((x) => x.startsWith('d')).toList();
+    final w1 = sessionTypes(p, 2, 1).whereType<String>().where((x) => x.startsWith('d')).toList();
+    expect([...w0, ...w1], ['d1', 'd2', 'd3', 'd1']);
+  });
+
+  test('loads snap to the plates and plate changes stay small', () {
+    final g = Gear()..handle = 1.5;
+    final l = dbLoads(g);
+    expect(l.first, 1.5);
+    expect(l.contains(4.5), isTrue); // 1.5 + 2 x 1.5
+    expect(snapLoad(12, g), anyOf(11.5, 12.5));
+    expect(_sum(sidePlates(9.5, const [], g)), 4);
+    // 9.5 -> 6.5 kg: the session plan loads 9.5 as 2.5 + 1.5 so the next
+    // move only needs one plate off
+    final d = AppData()
+      ..gear = g
+      ..loads = {'goblet': 9.5, 'row1': 6.5};
+    syncLadder(d);
+    final plan = platePlan(programs.firstWhere((p) => p.id == 'd1').seq(1), d);
+    expect(plan[0].side, [2.5, 1.5]);
+    expect(plan[1].change, 'Lepas 1,5 kg di tiap sisi');
+    syncLadder(AppData());
+  });
+
+  test('forecast is slower with adaptation, exercise compensation and partial adherence', () {
+    final p = Profile()
+      ..sex = 'm'
+      ..age = 35
+      ..height = 180
+      ..goal = 90
+      ..pKg = 107
+      ..pStart = DateTime(2026, 11, 25).millisecondsSinceEpoch;
+    final full = simulate('sedang', p), real = simulate('sedang', p, adh: .75);
+    expect(real.length, greaterThan(full.length));
+    // average loss stays within the usual 0.5-1 kg/week guidance
+    final perWk = 17 / (full.length - 1);
+    expect(perWk, inInclusiveRange(.4, 1.0));
+  });
 }
+
+double _sum(List<double> l) => l.fold(0.0, (a, b) => a + b);

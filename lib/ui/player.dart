@@ -14,25 +14,33 @@ import 'common.dart';
 class PlayerScreen extends StatefulWidget {
   final Program program;
   final int lvl;
-  const PlayerScreen({super.key, required this.program, this.lvl = 1});
+  final bool lite;
+  const PlayerScreen({super.key, required this.program, this.lvl = 1, this.lite = false});
   @override
   State<PlayerScreen> createState() => _PlayerScreenState();
 }
 
 class _PlayerScreenState extends State<PlayerScreen> {
-  late final List<WStep> seq = widget.program.seq(widget.lvl);
+  late final List<WStep> seq = widget.program.seq(widget.lvl, widget.lite);
   int i = 0, left = 0, done = 0;
   bool paused = false, finished = false;
   final List<String> doneWork = [];
   int cardioSec = 0;
 
+  int el = 0; // seconds spent on the current rep-based set
+
   void _record(bool partial) {
     final st = seq[i];
     if (st.type != 'work') return;
-    final el = st.sec - left;
-    if (!partial || el >= st.sec / 2) {
+    if (st.reps != null) {
+      // a rep set counts once the user taps "done" (or skips after trying)
+      if (st.counts && (!partial || el >= 5)) doneWork.add(st.ex);
+      return;
+    }
+    final el2 = st.sec - left;
+    if (!partial || el2 >= st.sec / 2) {
       doneWork.add(st.ex);
-      if (ex[st.ex]!.cardio) cardioSec += el;
+      if (ex[st.ex]!.cardio) cardioSec += el2;
     }
   }
   Timer? _t;
@@ -57,8 +65,30 @@ class _PlayerScreenState extends State<PlayerScreen> {
     } catch (_) {}
   }
 
+  void _next() {
+    _record(true);
+    i++;
+    if (i >= seq.length) {
+      i = seq.length - 1;
+      _finish(true);
+      return;
+    }
+    left = seq[i].sec;
+    el = 0;
+    HapticFeedback.mediumImpact();
+    _beep(seq[i].type == 'rest' ? _lo : _hi, seq[i].type == 'rest' ? 'rest.wav' : 'go.wav');
+  }
+
   void _tickFn() {
     if (paused || finished) return;
+    if (seq[i].reps != null) {
+      // rep sets have no countdown: the user taps "Set selesai"
+      setState(() {
+        el++;
+        done++;
+      });
+      return;
+    }
     setState(() {
       left--;
       done++;
@@ -71,6 +101,7 @@ class _PlayerScreenState extends State<PlayerScreen> {
           return;
         }
         left = seq[i].sec;
+        el = 0;
         HapticFeedback.mediumImpact();
         _beep(seq[i].type == 'rest' ? _lo : _hi, seq[i].type == 'rest' ? 'rest.wav' : 'go.wav');
       }
@@ -118,11 +149,27 @@ class _PlayerScreenState extends State<PlayerScreen> {
       _ => 'Pendinginan',
     };
     final tot = seq.fold<int>(0, (a, x) => a + x.sec);
-    final doneS = seq.take(i).fold<int>(0, (a, x) => a + x.sec) + (st.sec - left);
+    final doneS = seq.take(i).fold<int>(0, (a, x) => a + x.sec) + (st.reps != null ? el.clamp(0, st.sec) : st.sec - left);
     final nx = i + 1 < seq.length ? seq[i + 1] : null;
     final showLoad = e.range != null && (st.type == 'work' || (rest && !st.easy));
     final col = C.progColors[widget.program.color];
     final animId = rest && st.easy ? 'march' : st.ex;
+    final repSet = st.reps != null;
+    final sideTxt = st.side == null ? '' : ' · ${st.side}';
+    PlateStep? plate;
+    if (showLoad) {
+      for (final x in platePlan(seq, s.d)) {
+        if (x.id == st.ex) plate = x;
+      }
+    }
+    String stepTxt(WStep x) => x.type == 'rest'
+        ? (x.easy ? 'jalan santai' : 'istirahat')
+        : '${ex[x.ex]!.name}${x.side != null ? ' (${x.side})' : ''}';
+    String amount(WStep x) => x.reps != null ? '${x.reps} repetisi' : '${x.sec} dtk';
+    final big = repSet ? '${st.reps}' : '$left';
+    final bigSub = repSet
+        ? (st.side != null ? 'repetisi sisi ${st.side}' : (e.alt ? 'repetisi, kanan-kiri bergantian' : 'repetisi'))
+        : null;
 
     return PopScope(
       canPop: false,
@@ -142,7 +189,8 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   const Gap(10),
                   Meter(doneS / tot, color: col),
                   const Gap(14),
-                  Text(rest ? (st.easy ? 'Jalan santai' : (st.swap ? 'Siapkan ${fmtKg(loadOf(s.d, st.ex))} kg · ${e.name}' : 'Berikutnya: ${e.name}')) : e.name, style: display(st.swap ? 24 : 28)),
+                  Text(rest ? (st.easy ? 'Jalan santai' : (st.swap ? 'Siapkan ${fmtKg(loadOf(s.d, st.ex))} kg · ${e.name}' : 'Berikutnya: ${e.name}$sideTxt')) : '${e.name}$sideTxt',
+                      style: display(st.swap ? 24 : 28)),
                   Expanded(
                     child: LayoutBuilder(builder: (c, cs) {
                       final side = (cs.maxHeight * .62).clamp(90.0, 240.0).clamp(0.0, cs.maxWidth);
@@ -160,7 +208,12 @@ class _PlayerScreenState extends State<PlayerScreen> {
                         Padding(padding: const EdgeInsets.only(top: 6), child: MuscleLegend(textColor: pal.muted)),
                         Flexible(
                           child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            Flexible(child: FittedBox(child: Text('$left', style: display(110, color: rest ? pal.muted : col)))),
+                            Flexible(
+                                child: FittedBox(
+                                    child: Column(mainAxisSize: MainAxisSize.min, children: [
+                              Text(big, style: display(110, color: rest ? pal.muted : col)),
+                              if (bigSub != null) Text(bigSub, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 18, color: col)),
+                            ]))),
                             if (rest && !st.easy) ...[
                               const SizedBox(width: 12),
                               Btn('+15 dtk', small: true, ghost: true, onTap: () => setState(() => left += 15)),
@@ -183,39 +236,36 @@ class _PlayerScreenState extends State<PlayerScreen> {
                   ]),
                   if (showLoad) ...[
                     const Gap(10),
-                    _cue(context, 'Beban ${e.perHand ? 'per tangan' : 'total'}', [
+                    _cue(context, 'Beban ${e.perHand ? 'tiap dumbbell' : '1 dumbbell'}', [
                       Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-                        Btn('−1', small: true, ghost: true, onTap: () => s.setLoad(st.ex, loadOf(s.d, st.ex) - 1)),
+                        Btn('−', small: true, ghost: true, onTap: () => s.setLoad(st.ex, stepLoad(loadOf(s.d, st.ex), -1, s.d.gear))),
                         SizedBox(width: 110, child: Text('${fmtKg(loadOf(s.d, st.ex))} kg', textAlign: TextAlign.center, style: display(26))),
-                        Btn('+1', small: true, ghost: true, onTap: () => s.setLoad(st.ex, loadOf(s.d, st.ex) + 1)),
+                        Btn('+', small: true, ghost: true, onTap: () => s.setLoad(st.ex, stepLoad(loadOf(s.d, st.ex), 1, s.d.gear))),
                       ]),
-                      Muted('Saran awal ${e.range![0]}–${e.range![1]} kg. Pilih beban yang masih menyisakan 2–3 repetisi. Kalau 12 repetisi terasa mudah 2 sesi berturut-turut, naikkan 1–2 kg.', size: 12.5),
+                      if (plate != null) ...[
+                        Text('Pelat: ${plateTxt(plate.side)}', style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 14)),
+                        if (st.swap) Text(plate.change, style: TextStyle(fontWeight: FontWeight.w700, fontSize: 14, color: col)),
+                      ],
+                      Muted('Pilih beban yang masih menyisakan 2–3 repetisi di akhir set. Kalau ${e.reps} repetisi terasa mudah 2 sesi berturut-turut, naikkan satu langkah.', size: 12.5),
                     ]),
                   ],
                   const Gap(8),
-                  Muted(nx != null
-                      ? 'Selanjutnya: ${nx.type == 'rest' ? (nx.easy ? 'jalan santai' : 'istirahat') : ex[nx.ex]!.name} (${nx.sec} dtk)'
-                      : 'Langkah terakhir'),
+                  Muted(nx != null ? 'Selanjutnya: ${stepTxt(nx)} (${amount(nx)})' : 'Langkah terakhir'),
                   const Gap(12),
-                  Row(children: [
-                    Expanded(child: Btn('Selesai', ghost: true, onTap: () => _finish(false))),
-                    const SizedBox(width: 8),
-                    Expanded(child: Btn(paused ? 'Lanjut' : 'Jeda', color: col, onTap: () => setState(() => paused = !paused))),
-                    const SizedBox(width: 8),
-                    Expanded(
-                        child: Btn(rest && !st.easy ? 'Siap' : 'Lewati', ghost: true, onTap: () {
-                      setState(() {
-                        _record(true);
-                        i++;
-                        if (i >= seq.length) {
-                          i = seq.length - 1;
-                          _finish(true);
-                          return;
-                        }
-                        left = seq[i].sec;
-                      });
-                    })),
-                  ]),
+                  if (repSet)
+                    Row(children: [
+                      Expanded(child: Btn('Akhiri', ghost: true, onTap: () => _finish(false))),
+                      const SizedBox(width: 8),
+                      Expanded(flex: 2, child: Btn('Set selesai', color: col, onTap: () => setState(() => _next()))),
+                    ])
+                  else
+                    Row(children: [
+                      Expanded(child: Btn('Akhiri', ghost: true, onTap: () => _finish(false))),
+                      const SizedBox(width: 8),
+                      Expanded(child: Btn(paused ? 'Lanjut' : 'Jeda', color: col, onTap: () => setState(() => paused = !paused))),
+                      const SizedBox(width: 8),
+                      Expanded(child: Btn(rest && !st.easy ? 'Siap' : 'Lewati', ghost: true, onTap: () => setState(() => _next()))),
+                    ]),
                 ]),
               ),
             ),

@@ -68,6 +68,7 @@ class _MeTabState extends State<MeTab> {
       const _AccountCard(),
       const _UpdateCard(),
       if (hasPlan(p)) const _PlanSettings(),
+      const _GearCard(),
       Box(
         child: Col([
           const H3('Lencana'),
@@ -333,6 +334,49 @@ class _PlanSettingsState extends State<_PlanSettings> {
 
 /// Over-the-air updates (Shorebird): shows the installed patch and lets the
 /// user fetch a new one right away instead of waiting for the next launch.
+/// The user's adjustable dumbbells, used to round loads to what the plates
+/// allow and to plan plate changes.
+class _GearCard extends StatelessWidget {
+  const _GearCard();
+  @override
+  Widget build(BuildContext context) {
+    final s = AppScope.of(context);
+    final g = s.d.gear;
+    final loads = dbLoads(g);
+    Widget stepper(String label, String value, VoidCallback dec, VoidCallback inc) => Row(children: [
+          Expanded(child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600))),
+          Btn('−', small: true, ghost: true, onTap: dec),
+          SizedBox(width: 74, child: Text(value, textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w800, fontFeatures: tnum))),
+          Btn('+', small: true, ghost: true, onTap: inc),
+        ]);
+    void set(void Function() f) {
+      f();
+      s.save();
+    }
+
+    return Box(
+      child: Col([
+        const Row(children: [
+          Icon(Icons.fitness_center, color: C.blue),
+          SizedBox(width: 8),
+          Expanded(child: H3('Dumbbell saya')),
+        ]),
+        Muted('Beban latihan dibulatkan ke berat yang bisa dibuat dari pelatmu, dan aplikasi memberi tahu pelat mana yang dilepas atau dipasang di tiap gerakan.', size: 12.5),
+        stepper('Jumlah dumbbell', '${g.count}', () => set(() => g.count = 1), () => set(() => g.count = 2)),
+        stepper('Berat gagang', '${fmtKg(g.handle)} kg', () => set(() => g.handle = (g.handle - .5).clamp(.5, 10)),
+            () => set(() => g.handle = (g.handle + .5).clamp(.5, 10))),
+        for (final k in ['1.5', '2', '2.5'])
+          stepper('Pelat ${fmtKg(double.parse(k))} kg (per dumbbell)', '${g.plates[k] ?? 0} keping',
+              () => set(() => g.plates[k] = ((g.plates[k] ?? 0) - 2).clamp(0, 20)), () => set(() => g.plates[k] = ((g.plates[k] ?? 0) + 2).clamp(0, 20))),
+        Muted(
+            'Berat yang bisa dibuat per dumbbell: ${fmtKg(loads.first)}–${fmtKg(loads.last)} kg (${loads.length} pilihan).'
+            '${g.count == 1 ? ' Dengan 1 dumbbell, gerakan dua tangan dikerjakan satu tangan bergantian (kanan lalu kiri).' : ''}',
+            size: 12.5),
+      ], gap: 8),
+    );
+  }
+}
+
 class _UpdateCard extends StatefulWidget {
   const _UpdateCard();
   @override

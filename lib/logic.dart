@@ -202,8 +202,23 @@ class Ex {
   final Map<String, double> m; // muscle -> 1 primary, 0.5 secondary
   final bool cardio;
   final String why; // why this movement, with source
+  final int reps; // target repetitions per set (per side for [uni])
+  final bool hold; // timed hold instead of repetitions
+  final bool uni; // one side at a time: right side, then left side
+  final bool alt; // sides alternate within the set; [reps] counts both sides
   const Ex(this.name, this.how, this.tip,
-      {this.range, this.perHand = false, this.m = const {}, this.cardio = false, this.why = ''});
+      {this.range,
+      this.perHand = false,
+      this.m = const {},
+      this.cardio = false,
+      this.why = '',
+      this.reps = 12,
+      this.hold = false,
+      this.uni = false,
+      this.alt = false});
+
+  /// Counted in repetitions with a manual "done" (not a countdown).
+  bool get byReps => !cardio && !hold && m.isNotEmpty;
 }
 
 const ex = <String, Ex>{
@@ -211,20 +226,20 @@ const ex = <String, Ex>{
       why: 'Pemanasan aktif 5 menit menaikkan suhu otot dan memperbaiki performa latihan sesudahnya (Fradkin dkk., J Strength Cond Res 2010).'),
   'wallpush': Ex('Push-up dinding', 'Tangan di dinding selebar bahu, badan lurus, tekuk siku lalu dorong.', 'Berat: tangan di meja atau sandaran sofa yang kokoh.',
       m: {'dada': 1, 'lengan': .5, 'bahu': .5},
-      why: 'Push-up melatih otot dada sama efektifnya dengan bench press pada beban sebanding (Calatayud dkk., J Strength Cond Res 2015). Versi dinding mengurangi beban untuk pemula.'),
+      why: 'Push-up melatih otot dada sama efektifnya dengan bench press pada beban sebanding (Calatayud dkk., J Strength Cond Res 2015). Versi dinding mengurangi beban untuk pemula.', reps: 12),
   'sitstand': Ex('Duduk-berdiri dari kursi', 'Duduk di ujung kursi, berdiri tanpa bantuan tangan, duduk lagi pelan.', 'Mudah: pakai tangan. Berat: turun 3 hitungan.',
       m: {'kaki': 1, 'bokong': 1},
-      why: 'Gerakan fungsional dasar squat. Kursi membatasi kedalaman sehingga aman untuk lutut saat berat badan masih tinggi.'),
+      why: 'Gerakan fungsional dasar squat. Kursi membatasi kedalaman sehingga aman untuk lutut saat berat badan masih tinggi.', reps: 12),
   'sidestep': Ex('Langkah ke samping', 'Langkah kanan-kiri bergantian, tekuk lutut sedikit, ayun tangan.', 'Berat: tambah tepuk tangan di atas kepala.', cardio: true,
       why: 'Interval singkat dengan intensitas tinggi menurunkan lemak tubuh setara latihan kontinu dalam waktu lebih singkat (Wewege dkk., Obes Rev 2017). Versi tanpa lompat menjaga lutut.'),
   'bridge': Ex('Glute bridge', 'Berbaring, lutut ditekuk, angkat pinggul sampai lurus bahu-lutut, tahan 1 detik.', 'Kalau susah turun ke lantai: lakukan di kasur.',
       m: {'bokong': 1, 'pahaBlk': .5},
-      why: 'Gerakan dorong pinggul memberi aktivasi otot bokong lebih tinggi daripada squat (Contreras dkk., J Appl Biomech 2015).'),
+      why: 'Gerakan dorong pinggul memberi aktivasi otot bokong lebih tinggi daripada squat (Contreras dkk., J Appl Biomech 2015).', reps: 15),
   'row': Ex('Tarik ransel', 'Isi ransel dengan botol air, badan condong dengan punggung lurus, tarik ransel ke perut.', 'Bisa satu tangan bergantian, tangan lain bertumpu di meja.',
-      m: {'punggung': 1, 'lengan': .5}, why: 'Gerakan tarik menyeimbangkan gerakan dorong dan melatih punggung atas (Fenwick dkk., J Strength Cond Res 2009).'),
+      m: {'punggung': 1, 'lengan': .5}, why: 'Gerakan tarik menyeimbangkan gerakan dorong dan melatih punggung atas (Fenwick dkk., J Strength Cond Res 2009).', reps: 12),
   'birddog': Ex('Bird dog', 'Posisi merangkak, julurkan tangan kanan dan kaki kiri, tahan 2 detik, ganti.', 'Mudah: hanya tangan atau hanya kaki.',
       m: {'inti': 1, 'bokong': .5},
-      why: 'Salah satu "big three" McGill untuk stabilitas tulang belakang dengan beban rendah pada punggung bawah (Ekstrom dkk., JOSPT 2007; McGill, Low Back Disorders).'),
+      why: 'Salah satu "big three" McGill untuk stabilitas tulang belakang dengan beban rendah pada punggung bawah (Ekstrom dkk., JOSPT 2007; McGill, Low Back Disorders).', reps: 10, alt: true),
   'knee': Ex('Angkat lutut berdiri', 'Berdiri tegak, angkat lutut ke arah siku berlawanan bergantian.', 'Pegang kursi kalau perlu keseimbangan.', cardio: true, m: {'inti': .5},
       why: 'Interval singkat dengan intensitas tinggi menurunkan lemak tubuh setara latihan kontinu dalam waktu lebih singkat (Wewege dkk., Obes Rev 2017). Versi tanpa lompat menjaga lutut.'),
   'stepjack': Ex('Step jack (tanpa lompat)', 'Langkah satu kaki ke samping sambil angkat kedua tangan, kembali, ganti kaki.', 'Cepatkan tempo saat interval cepat.', cardio: true,
@@ -234,78 +249,78 @@ const ex = <String, Ex>{
   'squatpulse': Ex('Squat ke kursi', 'Duduk hampir menyentuh kursi lalu berdiri cepat.', 'Mudah: duduk penuh dulu.', cardio: true, m: {'kaki': .5},
       why: 'Interval singkat dengan intensitas tinggi menurunkan lemak tubuh setara latihan kontinu dalam waktu lebih singkat (Wewege dkk., Obes Rev 2017). Versi tanpa lompat menjaga lutut.'),
   'calf': Ex('Jinjit', 'Berdiri pegang sandaran kursi, naik jinjit, turun pelan.', 'Berat: satu kaki.', m: {'betis': 1},
-      why: 'Jinjit adalah latihan dasar untuk betis (gastroknemius dan soleus). ACSM menyarankan semua kelompok otot besar dilatih 2–3 kali seminggu (ACSM 2009).'),
+      why: 'Jinjit adalah latihan dasar untuk betis (gastroknemius dan soleus). ACSM menyarankan semua kelompok otot besar dilatih 2–3 kali seminggu (ACSM 2009).', reps: 15),
   'stretch': Ex('Peregangan', 'Tarik napas dalam, regangkan paha depan, paha belakang, dan bahu.', 'Tidak perlu memantul.',
       why: 'Pendinginan membantu napas dan detak jantung turun perlahan. Riset tidak menemukan efeknya mengurangi pegal otot keesokan hari (Van Hooren & Peake, Sports Med 2018).'),
-  'goblet': Ex('Goblet squat ke kursi', 'Pegang 1 dumbbell tegak di depan dada. Turun sampai pantat menyentuh kursi, lalu berdiri. Dada tegak, lutut searah jari kaki.', 'Target 10–12 repetisi pelan.',
+  'goblet': Ex('Goblet squat ke kursi', 'Pegang 1 dumbbell tegak di depan dada. Turun sampai pantat menyentuh kursi, lalu berdiri. Dada tegak, lutut searah jari kaki.', 'Turun 2–3 detik, naik 1 detik.',
       range: [8, 14], m: {'kaki': 1, 'bokong': 1, 'inti': .5},
-      why: 'Squat adalah gerakan inti untuk kekuatan kaki (ACSM Position Stand, Med Sci Sports Exerc 2009). Beban di depan dada menjaga badan tegak dan ramah punggung.'),
+      why: 'Squat adalah gerakan inti untuk kekuatan kaki (ACSM Position Stand, Med Sci Sports Exerc 2009). Beban di depan dada menjaga badan tegak dan ramah punggung.', reps: 10),
   'floorpress': Ex('Floor press', 'Berbaring (lantai atau kasur), dumbbell di tiap tangan. Dorong ke atas sampai lengan lurus, turunkan sampai siku menyentuh lantai.', 'Lebih ramah bahu daripada bench press.',
       range: [6, 12], perHand: true, m: {'dada': 1, 'lengan': .5, 'bahu': .5},
-      why: 'Gerakan dorong horizontal untuk dada dan trisep. Lantai membatasi gerak sehingga bahu lebih aman tanpa bangku.'),
-  'row1': Ex('Row satu tangan', 'Satu tangan dan lutut bertumpu di kursi, punggung datar. Tarik dumbbell ke pinggang, turunkan pelan. Ganti sisi di tengah waktu.', 'Bahu jauhi telinga.',
+      why: 'Gerakan dorong horizontal untuk dada dan trisep. Lantai membatasi gerak sehingga bahu lebih aman tanpa bangku.', reps: 10),
+  'row1': Ex('Row satu tangan', 'Satu tangan dan lutut bertumpu di kursi, punggung datar. Tarik dumbbell ke pinggang, turunkan pelan. Aplikasi memandu sisi kanan lalu kiri.', 'Bahu jauhi telinga.',
       range: [8, 14], perHand: true, m: {'punggung': 1, 'lengan': .5},
-      why: 'Row bertumpu melatih punggung dengan beban rendah pada punggung bawah dibanding row membungkuk (Fenwick dkk., J Strength Cond Res 2009).'),
+      why: 'Row bertumpu melatih punggung dengan beban rendah pada punggung bawah dibanding row membungkuk (Fenwick dkk., J Strength Cond Res 2009).', reps: 10, uni: true),
   'rdl': Ex('Romanian deadlift', 'Dumbbell di depan paha, lutut sedikit tekuk. Dorong pinggul ke belakang sampai paha belakang terasa tertarik, lalu berdiri.', 'Punggung tetap lurus. Jangan membungkuk melengkung.',
-      range: [8, 14], m: {'pahaBlk': 1, 'bokong': 1, 'punggung': .5},
-      why: 'RDL termasuk gerakan dengan aktivasi paha belakang tertinggi (McAllister dkk., J Strength Cond Res 2014).'),
+      range: [6, 14], perHand: true, m: {'pahaBlk': 1, 'bokong': 1, 'punggung': .5},
+      why: 'RDL termasuk gerakan dengan aktivasi paha belakang tertinggi (McAllister dkk., J Strength Cond Res 2014).', reps: 10),
   'carry': Ex('Farmer march', 'Pegang dumbbell di kedua sisi, berdiri tegak, jalan di tempat pelan. Perut kencang.', 'Bagus untuk genggaman dan otot inti.',
       range: [10, 20], perHand: true, m: {'inti': 1, 'lengan': .5, 'punggung': .5},
-      why: 'Membawa beban melatih otot inti dan genggaman secara bersamaan (McGill dkk., J Strength Cond Res 2009).'),
+      why: 'Membawa beban melatih otot inti dan genggaman secara bersamaan (McGill dkk., J Strength Cond Res 2009).', hold: true),
   'sumo': Ex('Sumo squat', 'Kaki lebar, jari kaki sedikit keluar, pegang 1 dumbbell menggantung di tengah. Turun selagi nyaman, berdiri.', 'Boleh pakai kursi di belakang sebagai patokan.',
       range: [8, 16], m: {'kaki': 1, 'bokong': 1},
-      why: 'Posisi kaki lebar menambah kerja bokong dan paha dalam dibanding squat kaki sempit, dengan kerja paha depan yang sama (Paoli dkk., J Strength Cond Res 2009).'),
+      why: 'Posisi kaki lebar menambah kerja bokong dan paha dalam dibanding squat kaki sempit, dengan kerja paha depan yang sama (Paoli dkk., J Strength Cond Res 2009).', reps: 10),
   'ohp': Ex('Overhead press duduk', 'Duduk tegak di kursi, dumbbell setinggi bahu. Dorong ke atas, turunkan pelan.', 'Jangan melengkungkan punggung bawah.',
       range: [4, 10], perHand: true, m: {'bahu': 1, 'lengan': .5},
-      why: 'Press dumbbell melatih otot bahu dengan baik; versi duduk lebih stabil untuk pemula (Saeterbakken & Fimland, J Strength Cond Res 2013).'),
+      why: 'Press dumbbell melatih otot bahu dengan baik; versi duduk lebih stabil untuk pemula (Saeterbakken & Fimland, J Strength Cond Res 2013).', reps: 10),
   'row2': Ex('Bent-over row', 'Badan condong 45°, punggung lurus, tarik kedua dumbbell ke perut.', 'Kalau punggung bawah pegal, pakai row satu tangan.',
       range: [6, 12], perHand: true, m: {'punggung': 1, 'lengan': .5, 'pahaBlk': .5},
-      why: 'Row membungkuk melatih punggung atas dan otot penahan punggung sekaligus (Fenwick dkk., J Strength Cond Res 2009).'),
+      why: 'Row membungkuk melatih punggung atas dan otot penahan punggung sekaligus (Fenwick dkk., J Strength Cond Res 2009).', reps: 10),
   'dbbridge': Ex('Glute bridge dumbbell', 'Berbaring, dumbbell di atas pinggul (pegang). Angkat pinggul, tahan 1 detik di atas.', 'Ganjal dumbbell dengan handuk agar nyaman.',
       range: [8, 20], m: {'bokong': 1, 'pahaBlk': .5},
-      why: 'Dorong pinggul berbeban memberi aktivasi bokong tertinggi di antara gerakan kaki (Contreras dkk., J Appl Biomech 2015).'),
+      why: 'Dorong pinggul berbeban memberi aktivasi bokong tertinggi di antara gerakan kaki (Contreras dkk., J Appl Biomech 2015).', reps: 12),
   'curl': Ex('Bicep curl', 'Berdiri, siku menempel badan, angkat dumbbell ke bahu lalu turunkan pelan.', 'Jangan mengayun badan.', range: [4, 10], perHand: true, m: {'lengan': 1},
-      why: 'Curl dumbbell berdiri memberi aktivasi biseps yang tinggi dan mudah diatur bebannya (Oliveira dkk., J Sports Sci Med 2009).'),
-  'splitsquat': Ex('Split squat (pegang kursi)', 'Satu kaki di depan, satu di belakang. Turunkan lutut belakang mendekati lantai, lalu naik. Pegang dumbbell di sisi atau satu tangan di kursi. Ganti kaki di tengah waktu.', 'Mudah: tanpa dumbbell, tangan di kursi.',
+      why: 'Curl dumbbell berdiri memberi aktivasi biseps yang tinggi dan mudah diatur bebannya (Oliveira dkk., J Sports Sci Med 2009).', reps: 12),
+  'splitsquat': Ex('Split squat (pegang kursi)', 'Satu kaki di depan, satu di belakang. Turunkan lutut belakang mendekati lantai, lalu naik. Pegang dumbbell di sisi atau satu tangan di kursi. Kaki kanan di depan dulu, lalu kiri.', 'Mudah: tanpa dumbbell, tangan di kursi.',
       range: [4, 10], perHand: true, m: {'kaki': 1, 'bokong': 1},
-      why: 'Latihan satu kaki memberi peningkatan kekuatan setara squat dua kaki dengan beban punggung lebih ringan (Speirs dkk., J Strength Cond Res 2016).'),
+      why: 'Latihan satu kaki memberi peningkatan kekuatan setara squat dua kaki dengan beban punggung lebih ringan (Speirs dkk., J Strength Cond Res 2016).', reps: 10, uni: true),
   'incline': Ex('Push-up miring (meja)', 'Tangan di tepi meja yang kokoh, badan lurus dari kepala ke tumit. Turunkan dada ke meja, lalu dorong.', 'Berat: makin rendah pegangan, makin berat.',
       m: {'dada': 1, 'lengan': .5, 'bahu': .5},
-      why: 'Push-up memberi hasil kekuatan setara bench press (Calatayud dkk., J Strength Cond Res 2015). Sudut miring menyesuaikan beban.'),
+      why: 'Push-up memberi hasil kekuatan setara bench press (Calatayud dkk., J Strength Cond Res 2015). Sudut miring menyesuaikan beban.', reps: 12),
   'deadbug': Ex('Dead bug', 'Berbaring, lengan lurus ke atas, lutut 90°. Julurkan tangan kanan ke belakang kepala dan kaki kiri lurus, punggung bawah tetap menempel lantai. Ganti sisi.', 'Mudah: gerakkan kaki saja.',
       m: {'inti': 1},
-      why: 'Melatih otot perut dalam sambil menjaga punggung bawah netral, aman untuk pemula (Ekstrom dkk., JOSPT 2007).'),
+      why: 'Melatih otot perut dalam sambil menjaga punggung bawah netral, aman untuk pemula (Ekstrom dkk., JOSPT 2007).', reps: 10, alt: true),
   // ---- harder rungs of the progression ladders ----
   'kneepush': Ex('Push-up lutut', 'Lutut di lantai (alasi handuk), tangan selebar bahu. Badan lurus dari kepala ke lutut, turunkan dada, lalu dorong.', 'Mudah: kembali ke push-up meja.',
       m: {'dada': 1, 'lengan': .5, 'bahu': .5, 'inti': .5},
-      why: 'Push-up lutut mengangkat sekitar 49% berat badan, push-up penuh sekitar 64% (Ebben dkk., J Strength Cond Res 2011). Ini anak tangga di antara push-up meja dan push-up penuh.'),
+      why: 'Push-up lutut mengangkat sekitar 49% berat badan, push-up penuh sekitar 64% (Ebben dkk., J Strength Cond Res 2011). Ini anak tangga di antara push-up meja dan push-up penuh.', reps: 10),
   'pushup': Ex('Push-up', 'Tangan selebar bahu, badan lurus dari kepala ke tumit. Turunkan dada sampai hampir menyentuh lantai, lalu dorong.', 'Perut dan bokong kencang supaya pinggang tidak turun.',
       m: {'dada': 1, 'lengan': .5, 'bahu': .5, 'inti': .5},
-      why: 'Push-up memberi peningkatan kekuatan setara bench press dengan beban sebanding (Calatayud dkk., J Strength Cond Res 2015). Mengangkat sekitar 64% berat badan (Ebben dkk., J Strength Cond Res 2011).'),
+      why: 'Push-up memberi peningkatan kekuatan setara bench press dengan beban sebanding (Calatayud dkk., J Strength Cond Res 2015). Mengangkat sekitar 64% berat badan (Ebben dkk., J Strength Cond Res 2011).', reps: 8),
   'squat': Ex('Squat bebas', 'Kaki selebar bahu, tangan lurus ke depan. Dorong pinggul ke belakang, turun sampai paha sejajar lantai, lalu berdiri.', 'Lutut searah jari kaki, tumit tetap menapak.',
       m: {'kaki': 1, 'bokong': 1, 'inti': .5},
-      why: 'Squat melatih paha depan, bokong, dan paha belakang sekaligus. Kedalaman sampai paha sejajar lantai aman untuk lutut sehat (Schoenfeld, J Strength Cond Res 2010).'),
+      why: 'Squat melatih paha depan, bokong, dan paha belakang sekaligus. Kedalaman sampai paha sejajar lantai aman untuk lutut sehat (Schoenfeld, J Strength Cond Res 2010).', reps: 12),
   'rlunge': Ex('Reverse lunge', 'Berdiri tegak, langkahkan satu kaki ke belakang, turunkan lutut belakang mendekati lantai, lalu kembali. Ganti kaki bergantian.', 'Pegang kursi kalau perlu keseimbangan.',
       m: {'kaki': 1, 'bokong': 1, 'inti': .5},
-      why: 'Latihan satu kaki memberi peningkatan kekuatan setara squat dua kaki (Speirs dkk., J Strength Cond Res 2016). Langkah ke belakang mengurangi beban lutut depan dibanding lunge maju.'),
+      why: 'Latihan satu kaki memberi peningkatan kekuatan setara squat dua kaki (Speirs dkk., J Strength Cond Res 2016). Langkah ke belakang mengurangi beban lutut depan dibanding lunge maju.', reps: 12, alt: true),
   'gobletfull': Ex('Goblet squat penuh', 'Pegang 1 dumbbell tegak di depan dada. Turun sedalam yang nyaman tanpa kursi, sampai paha sejajar lantai atau lebih rendah, lalu berdiri.', 'Dada tegak, tumit menapak.',
       range: [10, 20], m: {'kaki': 1, 'bokong': 1, 'inti': .5},
-      why: 'Squat dalam memberi pertambahan otot bokong dan paha dalam lebih besar daripada squat setengah (Kubo dkk., Eur J Appl Physiol 2019).'),
-  'bulgarian': Ex('Bulgarian split squat', 'Punggung kaki belakang di atas kursi, kaki depan satu langkah besar di depan. Dumbbell di sisi badan. Turun lurus ke bawah, lalu naik. Ganti kaki di tengah waktu.', 'Mudah: tanpa dumbbell.',
+      why: 'Squat dalam memberi pertambahan otot bokong dan paha dalam lebih besar daripada squat setengah (Kubo dkk., Eur J Appl Physiol 2019).', reps: 10),
+  'bulgarian': Ex('Bulgarian split squat', 'Punggung kaki belakang di atas kursi, kaki depan satu langkah besar di depan. Dumbbell di sisi badan. Turun lurus ke bawah, lalu naik. Kaki kanan di depan dulu, lalu kiri.', 'Mudah: tanpa dumbbell.',
       range: [6, 14], perHand: true, m: {'kaki': 1, 'bokong': 1, 'pahaBlk': .5},
-      why: 'Split squat dengan kaki belakang ditinggikan memberi kekuatan dan aktivasi otot kaki setara squat dua kaki, dengan beban punggung jauh lebih ringan (Speirs dkk., J Strength Cond Res 2016; McCurdy dkk., J Sport Rehabil 2010).'),
-  'slbridge': Ex('Bridge satu kaki', 'Berbaring, satu lutut ditekuk, kaki lain lurus sejajar paha. Angkat pinggul dengan satu kaki, tahan 1 detik. Ganti kaki di tengah waktu.', 'Pinggul tetap rata, jangan miring.',
+      why: 'Split squat dengan kaki belakang ditinggikan memberi kekuatan dan aktivasi otot kaki setara squat dua kaki, dengan beban punggung jauh lebih ringan (Speirs dkk., J Strength Cond Res 2016; McCurdy dkk., J Sport Rehabil 2010).', reps: 8, uni: true),
+  'slbridge': Ex('Bridge satu kaki', 'Berbaring, satu lutut ditekuk, kaki lain lurus sejajar paha. Angkat pinggul dengan satu kaki, tahan 1 detik. Kanan dulu, lalu kiri.', 'Pinggul tetap rata, jangan miring.',
       m: {'bokong': 1, 'pahaBlk': .5, 'inti': .5},
-      why: 'Bridge satu kaki memberi aktivasi bokong lebih tinggi daripada bridge dua kaki (Ekstrom dkk., JOSPT 2007).'),
+      why: 'Bridge satu kaki memberi aktivasi bokong lebih tinggi daripada bridge dua kaki (Ekstrom dkk., JOSPT 2007).', reps: 10, uni: true),
   'hipthrust': Ex('Hip thrust dumbbell', 'Punggung atas bersandar di tepi sofa atau kasur, dumbbell di atas pinggul. Dorong pinggul sampai badan lurus dari bahu ke lutut, tahan 1 detik.', 'Dagu menunduk sedikit, jangan melengkungkan punggung bawah.',
       range: [10, 30], m: {'bokong': 1, 'pahaBlk': .5},
-      why: 'Hip thrust memberi aktivasi bokong lebih tinggi daripada squat (Contreras dkk., J Appl Biomech 2015). Bersandar di sofa memberi rentang gerak lebih besar daripada bridge di lantai.'),
+      why: 'Hip thrust memberi aktivasi bokong lebih tinggi daripada squat (Contreras dkk., J Appl Biomech 2015). Bersandar di sofa memberi rentang gerak lebih besar daripada bridge di lantai.', reps: 10),
   'plank': Ex('Plank', 'Bertumpu di lengan bawah dan ujung kaki, badan lurus dari kepala ke tumit. Tahan sambil bernapas biasa.', 'Mudah: lutut di lantai.',
       m: {'inti': 1, 'bahu': .5},
-      why: 'Plank melatih otot perut untuk menahan tulang belakang tetap netral, cara kerja inti yang dipakai sehari-hari (McGill, Strength Cond J 2010; Ekstrom dkk., JOSPT 2007).'),
+      why: 'Plank melatih otot perut untuk menahan tulang belakang tetap netral, cara kerja inti yang dipakai sehari-hari (McGill, Strength Cond J 2010; Ekstrom dkk., JOSPT 2007).', hold: true),
   'ohps': Ex('Overhead press berdiri', 'Berdiri tegak, kaki selebar pinggul, dumbbell setinggi bahu. Dorong ke atas, turunkan pelan. Perut dan bokong kencang.', 'Jangan melengkungkan punggung bawah.',
       range: [4, 12], perHand: true, m: {'bahu': 1, 'lengan': .5, 'inti': .5},
-      why: 'Press berdiri memberi aktivasi bahu dan otot inti lebih tinggi daripada press duduk (Saeterbakken & Fimland, J Strength Cond Res 2013).'),
+      why: 'Press berdiri memberi aktivasi bahu dan otot inti lebih tinggi daripada press duduk (Saeterbakken & Fimland, J Strength Cond Res 2013).', reps: 8),
   'stepup': Ex('Naik-turun anak tangga', 'Naik satu anak tangga dengan satu kaki, kaki lain menyusul, lalu turun. Ganti kaki depan tiap 10 detik.', 'Pegang pegangan tangga. Cepatkan tempo saat interval cepat.',
       cardio: true, m: {'kaki': .5, 'bokong': .5},
       why: 'Step-up menggerakkan otot kaki besar dan menaikkan detak jantung dengan benturan rendah (Simenz dkk., J Strength Cond Res 2012; Wewege dkk., Obes Rev 2017).'),
@@ -318,10 +333,21 @@ class WStep {
   final bool easy;
   final bool swap; // rest used to change the dumbbell load for the next exercise
   final String? base; // the program's own move when a ladder swapped [ex]
-  const WStep(this.ex, this.sec, this.type, {this.round, this.setOf, this.easy = false, this.swap = false, this.base});
+  final int? reps; // repetitions instead of a countdown (work only)
+  final String? side; // 'kanan' | 'kiri' for one-side moves
+  const WStep(this.ex, this.sec, this.type, {this.round, this.setOf, this.easy = false, this.swap = false, this.base, this.reps, this.side});
   String get root => base ?? ex;
-  WStep as(String id) => id == ex ? this : WStep(id, sec, type, round: round, setOf: setOf, easy: easy, swap: swap, base: ex);
+  WStep as(String id) => id == ex ? this : WStep(id, sec, type, round: round, setOf: setOf, easy: easy, swap: swap, base: ex, reps: reps, side: side);
+  WStep withReps(int r, int s, [String? sd]) =>
+      WStep(ex, s, type, round: round, setOf: setOf, easy: easy, swap: swap, base: base, reps: r, side: sd);
+
+  /// Counts toward muscle sets (the left half of a one-side set does not
+  /// count again).
+  bool get counts => type == 'work' && side != 'kiri';
 }
+
+/// Seconds a rep-based set takes on average (2-3 s down, 1 s up).
+const secPerRep = 3.5;
 
 // ---------- progression ladders ----------
 /// One step of a ladder: unlocked from training level [lvl] and once BMI is
@@ -353,6 +379,8 @@ const ladders = <String, List<Rung>>{
 class LadderCtx {
   double bmi = 99;
   Map<String, int> down = {};
+  int dumbbells = 2;
+  Gear gear = Gear();
 }
 
 final ladder = LadderCtx();
@@ -361,6 +389,8 @@ void syncLadder(AppData s) {
   final h = s.profile.height;
   ladder.bmi = s.weights.isEmpty || h <= 0 ? 99 : bmiOf(s.weights.last.kg, h);
   ladder.down = s.down;
+  ladder.dumbbells = s.gear.count;
+  ladder.gear = s.gear;
 }
 
 /// Highest unlocked rung index for [base] at level [lvl], ignoring step-downs.
@@ -388,7 +418,8 @@ String? nextRungTxt(String base, int lvl) {
   return 'Berikutnya: ${ex[r.id]!.name} (buka di ${need.join(' dan ')})';
 }
 
-List<WStep> _sets(List<String> ids, int n, int work, int rest, int warm) {
+List<WStep> _sets(List<String> ids, int n, int work, int rest, int warm, [bool lite = false]) {
+  if (lite) n = 2;
   final seq = <WStep>[WStep('march', warm, 'warm')];
   // time to pick up the dumbbell and set its load before the first exercise
   if (ex[ids[0]]!.range != null) seq.add(WStep(ids[0], 45, 'rest', swap: true));
@@ -406,7 +437,8 @@ List<WStep> _sets(List<String> ids, int n, int work, int rest, int warm) {
   return seq;
 }
 
-List<WStep> _circuit(List<String> ids, int work, int rest, int rounds, int warm) {
+List<WStep> _circuit(List<String> ids, int work, int rest, int rounds, int warm, [bool lite = false]) {
+  if (lite) rounds = math.max(1, rounds - 1);
   final seq = <WStep>[];
   if (warm > 0) seq.add(WStep('march', warm, 'warm'));
   for (var r = 1; r <= rounds; r++) {
@@ -422,10 +454,10 @@ List<WStep> _circuit(List<String> ids, int work, int rest, int rounds, int warm)
   return seq;
 }
 
-List<WStep> _intervals([int lvl = 1]) {
+List<WStep> _intervals([int lvl = 1, bool lite = false]) {
   final seq = <WStep>[const WStep('march', 120, 'warm')];
   const fast = ['stepjack', 'box', 'knee', 'squatpulse'];
-  for (var i = 0; i < 6 + 2 * lvl; i++) {
+  for (var i = 0; i < (lite ? 4 + lvl : 6 + 2 * lvl); i++) {
     seq.add(WStep(fast[i % 4], 30, 'work', round: i + 1));
     seq.add(const WStep('march', 30, 'rest', easy: true));
   }
@@ -437,19 +469,43 @@ class Program {
   final String id, name, lvl, kind, desc;
   final int color; // index into palette
   final bool db;
-  final List<WStep> Function([int lvl]) raw;
+  final List<WStep> Function([int lvl, bool lite]) raw;
   const Program(this.id, this.name, this.lvl, this.kind, this.desc, this.color, this.raw, {this.db = false});
 
-  /// The session at level [l], with each move on its current ladder rung.
-  List<WStep> seq([int l = 1]) => [for (final s in raw(l)) s.as(rungFor(s.ex, l))];
+  /// The session at level [l], with each move on its current ladder rung,
+  /// strength sets counted in reps, and one-side moves split into right and
+  /// left. [lite] = light day: fewer sets and every ladder one rung easier.
+  List<WStep> seq([int l = 1, bool lite = false]) {
+    final out = <WStep>[];
+    for (final s0 in raw(l, lite)) {
+      final id = lite ? (ladders[s0.ex]?[math.max(0, rungIdx(s0.ex, l) - 1)].id ?? s0.ex) : rungFor(s0.ex, l);
+      final s = s0.as(id);
+      final e = ex[s.ex]!;
+      if (s.type != 'work' || !e.byReps) {
+        out.add(s);
+        continue;
+      }
+      // with a single dumbbell, two-dumbbell moves are done one arm at a time
+      final uni = e.uni || (e.perHand && e.range != null && ladder.dumbbells == 1);
+      final sec = (e.reps * secPerRep).round();
+      if (uni) {
+        out.add(s.withReps(e.reps, sec, 'kanan'));
+        out.add(s.withReps(e.reps, sec, 'kiri'));
+      } else {
+        out.add(s.withReps(e.reps, sec));
+      }
+    }
+    return out;
+  }
   int minutesAt(int l) => (seq(l).fold<int>(0, (a, s) => a + s.sec) / 60).round();
   int get minutes => minutesAt(1);
   List<String> exIdsAt(int l) => seq(l).where((s) => s.type == 'work').map((s) => s.ex).toSet().toList();
+  List<String> get dbIdsAt1 => exIds.where((id) => ex[id]!.range != null).toList();
   List<String> get exIds => exIdsAt(1);
   List<String> get baseIds => raw().where((s) => s.type == 'work').map((s) => s.ex).toSet().toList();
 
   /// Sets per muscle group for a full session at level [l].
-  Map<String, double> musclesAt(int l) => setsFrom(seq(l).where((s) => s.type == 'work').map((s) => s.ex));
+  Map<String, double> musclesAt(int l) => setsFrom(seq(l).where((s) => s.counts).map((s) => s.ex));
   int cardioMinAt(int l) => (seq(l).where((s) => s.type == 'work' && ex[s.ex]!.cardio).fold<int>(0, (a, s) => a + s.sec) / 60).round();
 }
 
@@ -462,18 +518,27 @@ Map<String, double> setsFrom(Iterable<String> workExIds) {
 }
 
 // Full-body sessions built from compound movements (ACSM 2009: multi-joint
-// exercises, 8-12 reps, 2-3 days/week for novices).
-List<WStep> _p1([int lvl = 1]) => _circuit(['wallpush', 'sitstand', 'sidestep', 'calf', 'knee'], 30, 30, 2, 120);
-List<WStep> _p2([int lvl = 1]) => _circuit(['sitstand', 'wallpush', 'bridge', 'row', 'birddog', 'calf'], 40, 20, lvl >= 3 ? 4 : 3, 150);
-List<WStep> _d1([int lvl = 1]) => _sets(['goblet', 'floorpress', 'row1', 'rdl', 'carry'], lvl >= 3 ? 4 : 3, 40, lvl >= 2 ? 35 : 40, 150);
-List<WStep> _d2([int lvl = 1]) => _sets(['splitsquat', 'incline', 'row2', 'ohp', 'dbbridge', 'deadbug'], lvl >= 3 ? 4 : 3, 40, lvl >= 2 ? 35 : 40, 150);
+// exercises, 8-12 reps, 2-3 days/week for novices). The dumbbell days rotate
+// A -> B -> C with ONE leg pattern per day (squat, hinge, single leg), so legs
+// are trained every session without two hard leg moves on the same day.
+// Within a day, moves run from heavy to light so plates mostly come off.
+List<WStep> _p1([int lvl = 1, bool lite = false]) => _circuit(['wallpush', 'sitstand', 'sidestep', 'calf', 'knee'], 30, 30, 2, 120, lite);
+List<WStep> _p2([int lvl = 1, bool lite = false]) =>
+    _circuit(['sitstand', 'wallpush', 'bridge', 'row', 'birddog', 'calf'], 40, 20, lvl >= 3 ? 4 : 3, 150, lite);
+List<WStep> _d1([int lvl = 1, bool lite = false]) =>
+    _sets(['goblet', 'row1', 'floorpress', 'curl', 'deadbug'], lvl >= 3 ? 4 : 3, 40, lvl >= 2 ? 60 : 75, 150, lite);
+List<WStep> _d2([int lvl = 1, bool lite = false]) =>
+    _sets(['rdl', 'row2', 'incline', 'ohp', 'birddog'], lvl >= 3 ? 4 : 3, 40, lvl >= 2 ? 60 : 75, 150, lite);
+List<WStep> _d3([int lvl = 1, bool lite = false]) =>
+    _sets(['splitsquat', 'row2', 'floorpress', 'ohp', 'deadbug'], lvl >= 3 ? 4 : 3, 40, lvl >= 2 ? 60 : 75, 150, lite);
 
 // color: 0 green, 1 blue, 2 purple, 3 pink, 4 red
 const programs = [
   Program('p1', 'Mulai Ringan', 'Pemula', 'str', 'Untuk minggu-minggu pertama. Semua gerakan berdiri atau bertumpu, aman untuk lutut.', 0, _p1),
   Program('p2', 'Kekuatan Dasar', 'Latihan otot', 'str', 'Latih otot besar seluruh tubuh tanpa alat. Lakukan 2–3 kali seminggu, selang sehari.', 1, _p2),
-  Program('d1', 'Dumbbell A · Seluruh Tubuh', 'Dumbbell', 'str', 'Squat, dorong, tarik, hinge, dan bawa beban: lima pola gerak dasar. 3 set × 40 detik (sekitar 10–12 repetisi).', 2, _d1, db: true),
-  Program('d2', 'Dumbbell B · Seluruh Tubuh', 'Dumbbell', 'str', 'Pasangan A: satu kaki, dorong miring, tarik, tekan ke atas, pinggul, dan perut. Selang-seling A dan B, minimal 1 hari jeda.', 3, _d2, db: true),
+  Program('d1', 'Dumbbell A · Squat', 'Dumbbell', 'str', 'Kaki: goblet squat. Lalu tarik satu tangan, dorong, lengan, dan perut. Satu gerakan kaki saja hari ini.', 2, _d1, db: true),
+  Program('d2', 'Dumbbell B · Hinge', 'Dumbbell', 'str', 'Kaki: Romanian deadlift (paha belakang dan bokong). Lalu tarik, push-up, bahu, dan punggung bawah.', 3, _d2, db: true),
+  Program('d3', 'Dumbbell C · Satu Kaki', 'Dumbbell', 'str', 'Kaki: split squat kanan dan kiri. Lalu tarik, dorong, bahu, dan perut. A, B, C bergiliran.', 1, _d3, db: true),
   Program('p3', 'Kardio Interval Tanpa Lompat', 'Kardio', 'prog', '30 detik cepat, 30 detik santai. Detak jantung naik tanpa membebani sendi.', 4, _intervals),
 ];
 
@@ -485,9 +550,177 @@ const programRefs = [
   'Calatayud J dkk. J Strength Cond Res 2015 · Contreras B dkk. J Appl Biomech 2015 · McAllister MJ dkk. J Strength Cond Res 2014 · Fenwick CM dkk. J Strength Cond Res 2009 · Speirs DE dkk. J Strength Cond Res 2016 · Saeterbakken AH & Fimland MS. J Strength Cond Res 2013 · Ekstrom RA dkk. JOSPT 2007 · Paoli A dkk. J Strength Cond Res 2009 · Oliveira LF dkk. J Sports Sci Med 2009.',
   'Tangga tingkat: Ebben WP dkk. J Strength Cond Res 2011 (beban push-up) · Schoenfeld BJ. J Strength Cond Res 2010 (squat) · Kubo K dkk. Eur J Appl Physiol 2019 (squat dalam) · McCurdy K dkk. J Sport Rehabil 2010 (split squat) · McGill SM. Strength Cond J 2010 (plank) · Simenz CJ dkk. J Strength Cond Res 2012 (step-up).',
   'Pemanasan dan pendinginan: Fradkin AJ dkk. J Strength Cond Res 2010 · Van Hooren B & Peake JM. Sports Med 2018.',
+  'Frekuensi: Schoenfeld BJ dkk. Effects of resistance training frequency on muscle hypertrophy. Sports Med 2016. (Melatih otot 2× seminggu lebih baik daripada 1×; karena itu tiap hari dumbbell tetap punya satu gerakan kaki.)',
+  'Istirahat antar set 1–2 menit untuk pemula: ACSM 2009 · de Salles BF dkk. Sports Med 2009.',
+  'Motivasi: Teixeira PJ dkk. Int J Behav Nutr Phys Act 2012 (rasa bisa memilih membuat orang lebih bertahan berolahraga) · Ekkekakis P dkk. Sports Med 2011 dan Rhodes RE & Kates A. Ann Behav Med 2015 (latihan yang terasa lebih enak memprediksi orang mengulanginya) · Gollwitzer PM & Sheeran P. Adv Exp Soc Psychol 2006 (rencana "kalau-maka").',
+  'Prediksi berat: Hall KD dkk. Lancet 2011 · Rosenbaum M & Leibel RL. Int J Obes 2010 · Thomas DM dkk. Obes Rev 2012 · Dansinger ML dkk. JAMA 2005.',
 ];
 
-double loadOf(AppData s, String id) => s.loads[id] ?? (ex[id]!.range?[0] ?? 0).toDouble();
+double loadOf(AppData s, String id) => snapLoad(s.loads[id] ?? (ex[id]!.range?[0] ?? 0).toDouble(), s.gear);
+
+// ---------- dumbbell plates ----------
+/// Plate sizes, heaviest first, and how many PAIRS of each fit one dumbbell.
+List<(double, int)> _pairs(Gear g) {
+  final l = [for (final e in g.plates.entries) (double.parse(e.key), e.value ~/ 2)]..removeWhere((x) => x.$2 <= 0);
+  l.sort((a, b) => b.$1.compareTo(a.$1));
+  return l;
+}
+
+/// Every way to load one side: plate lists, heaviest first.
+List<List<double>> _sideCombos(Gear g) {
+  final pairs = _pairs(g);
+  var out = <List<double>>[[]];
+  for (final (kg, n) in pairs) {
+    out = [
+      for (final c in out)
+        for (var k = 0; k <= n; k++) [...c, for (var i = 0; i < k; i++) kg]
+    ];
+  }
+  return out;
+}
+
+double _sum(List<double> l) => l.fold(0.0, (a, b) => a + b);
+double _r(double x) => (x * 100).round() / 100;
+
+/// Weights one dumbbell can be set to (handle + plates on both sides).
+List<double> dbLoads([Gear? g]) {
+  g ??= ladder.gear;
+  final set = {for (final c in _sideCombos(g)) _r(g.handle + 2 * _sum(c))};
+  return set.toList()..sort();
+}
+
+/// Nearest weight the dumbbell can actually be set to.
+double snapLoad(double kg, [Gear? g]) {
+  final l = dbLoads(g);
+  if (l.isEmpty || kg <= 0) return kg;
+  var best = l.first;
+  for (final x in l) {
+    if ((x - kg).abs() < (best - kg).abs() - 1e-9) best = x;
+  }
+  return best;
+}
+
+/// The next settable weight up (dir 1) or down (dir -1).
+double stepLoad(double kg, int dir, [Gear? g]) {
+  final l = dbLoads(g);
+  if (dir > 0) return l.firstWhere((x) => x > kg + 1e-9, orElse: () => l.last);
+  return l.lastWhere((x) => x < kg - 1e-9, orElse: () => l.first);
+}
+
+/// Plates for one side to reach [kg], changing as few plates as possible
+/// from [from] (the plates already on).
+List<double> sidePlates(double kg, [List<double> from = const [], Gear? g]) {
+  g ??= ladder.gear;
+  final want = (kg - g.handle) / 2;
+  List<double>? best;
+  var bestCost = 1 << 30;
+  for (final c in _sideCombos(g)) {
+    if ((_sum(c) - want).abs() > 1e-6) continue;
+    final rest = [...from];
+    var keep = 0;
+    for (final x in c) {
+      if (rest.remove(x)) keep++;
+    }
+    final cost = (c.length - keep) + rest.length; // plates added + removed
+    if (cost < bestCost || (cost == bestCost && c.length < best!.length)) {
+      bestCost = cost;
+      best = c;
+    }
+  }
+  return best ?? const [];
+}
+
+String _kgList(List<double> l) => l.map(fmtKg).join(' + ');
+
+String plateTxt(List<double> side) => side.isEmpty ? 'gagang saja' : '${_kgList(side)} kg tiap sisi';
+
+/// What to do to go from plates [a] to plates [b] (per side).
+String changeTxt(List<double> a, List<double> b) {
+  final add = [...b], off = <double>[];
+  for (final x in a) {
+    if (!add.remove(x)) off.add(x);
+  }
+  if (add.isEmpty && off.isEmpty) return 'Tidak perlu ganti pelat';
+  final t = [
+    if (off.isNotEmpty) 'lepas ${_kgList(off)} kg',
+    if (add.isNotEmpty) 'pasang ${_kgList(add)} kg',
+  ].join(', ');
+  return '${t[0].toUpperCase()}${t.substring(1)} di tiap sisi';
+}
+
+/// Plate plan for a session: for every dumbbell move, its weight, the plates
+/// per side and what changes from the previous dumbbell move.
+class PlateStep {
+  final String id;
+  final double kg;
+  final List<double> side;
+  final String change;
+  PlateStep(this.id, this.kg, this.side, this.change);
+}
+
+int _changes(List<double> a, List<double> b) {
+  final rest = [...a];
+  var keep = 0;
+  for (final x in b) {
+    if (rest.remove(x)) keep++;
+  }
+  return (b.length - keep) + rest.length;
+}
+
+/// Picks plates for every dumbbell move of the session together, so the
+/// total number of plates moved over the whole session is as small as
+/// possible (a heavy move is loaded in a way the lighter ones can reuse).
+List<PlateStep> platePlan(List<WStep> seq, AppData s) {
+  final ids = <String>[];
+  for (final st in seq.where((x) => x.type == 'work' && ex[x.ex]!.range != null)) {
+    if (ids.isEmpty || ids.last != st.ex) ids.add(st.ex);
+  }
+  if (ids.isEmpty) return [];
+  final combos = _sideCombos(s.gear);
+  final kgs = [for (final id in ids) loadOf(s, id)];
+  final opts = [
+    for (final kg in kgs) [for (final c in combos) if ((s.gear.handle + 2 * _sum(c) - kg).abs() < 1e-6) c]
+  ];
+  for (var i = 0; i < opts.length; i++) {
+    if (opts[i].isEmpty) opts[i] = [const <double>[]];
+  }
+  // cost[i][k]: fewest plate moves to reach option k of move i
+  final cost = <List<int>>[], from = <List<int>>[];
+  cost.add([for (final c in opts[0]) c.length]);
+  from.add(List.filled(opts[0].length, -1));
+  for (var i = 1; i < opts.length; i++) {
+    final ci = <int>[], fi = <int>[];
+    for (final c in opts[i]) {
+      var best = 1 << 30, arg = 0;
+      for (var k = 0; k < opts[i - 1].length; k++) {
+        final v = cost[i - 1][k] + _changes(opts[i - 1][k], c);
+        if (v < best) {
+          best = v;
+          arg = k;
+        }
+      }
+      ci.add(best);
+      fi.add(arg);
+    }
+    cost.add(ci);
+    from.add(fi);
+  }
+  var k = 0;
+  for (var j = 1; j < cost.last.length; j++) {
+    if (cost.last[j] < cost.last[k]) k = j;
+  }
+  final pick = List<int>.filled(opts.length, 0);
+  for (var i = opts.length - 1; i >= 0; i--) {
+    pick[i] = k;
+    k = from[i][k];
+  }
+  final out = <PlateStep>[];
+  for (var i = 0; i < ids.length; i++) {
+    final side = opts[i][pick[i]];
+    out.add(PlateStep(ids[i], kgs[i], side, i == 0 ? 'Pasang ${plateTxt(side)}' : changeTxt(opts[i - 1][pick[i - 1]], side)));
+  }
+  return out;
+}
 
 // ---------- personal plan ----------
 class Pace {
@@ -550,16 +783,26 @@ class Wk {
   Wk(this.w, this.t, this.kg, this.intake, this.exMin, this.fast, this.deficit);
 }
 
-List<Wk> simulate(String pace, Profile p) {
+/// Week-by-week weight forecast.
+/// - Energy need: Mifflin-St Jeor x activity, recalculated at each new weight.
+/// - Metabolic adaptation: energy need drops a bit more than weight alone
+///   explains, about 5% after a 10% loss (Rosenbaum & Leibel, Int J Obes
+///   2010; Hall dkk., Lancet 2011 use a smaller effect, so this is mid-range).
+/// - Exercise: only 70% of its calories counted, because people partly eat
+///   back and move less the rest of the day (Thomas dkk., Obes Rev 2012).
+/// - [adh]: share of the planned deficit actually kept (1 = always).
+/// - Loss per week capped at 1% of body weight (safe-rate guidelines).
+List<Wk> simulate(String pace, Profile p, {double adh = 1}) {
   final minI = p.sex == 'm' ? 1500.0 : 1200.0;
   final wk = <Wk>[];
   var kg = p.pKg;
-  for (var w = 0; w <= 260; w++) {
-    final tdee = bmrOf(kg, p) * p.act;
+  for (var w = 0; w <= 400; w++) {
+    final lost = math.max(0.0, (p.pKg - kg) / p.pKg);
+    final tdee = bmrOf(kg, p) * p.act * (1 - math.min(.06, lost * .5));
     final exMin = exMinOf(w, p, pace);
-    final exK = exMin * (5 - 1) * 3.5 * kg / 200 / 7;
-    final intake = math.max(minI, tdee - paces[pace]!.def);
-    final deficit = tdee + exK - intake;
+    final exK = exMin * (5 - 1) * 3.5 * kg / 200 / 7 * .7;
+    final intake = math.max(minI, bmrOf(kg, p) * p.act - paces[pace]!.def);
+    final deficit = (tdee + exK - intake) * adh;
     wk.add(Wk(w, p.pStart + w * 7 * dayMs, kg, intake, exMin, fastOf(w, p, pace), deficit));
     if (kg <= p.goal) break;
     kg = math.max(p.goal, kg - math.min(kg * .01, deficit * 7 / 7700));
@@ -603,18 +846,18 @@ String durText(List<Wk> wk) {
 }
 
 /// Weekly schedule for a 7-day week starting Monday: program id, 'walk', or null (rest).
-List<String?> sessionTypes(Profile p, int phase) {
+List<String?> sessionTypes(Profile p, int phase, [int week = 0]) {
   final db = p.equip == 'db';
-  final ka = db ? (phase == 1 ? 'p1' : 'd1') : (phase == 1 ? 'p1' : 'p2');
-  final kb = db ? (phase == 1 ? 'd1' : 'd2') : ka;
-  final k0 = [ka, kb];
-  var kc = 0;
+  final List<String> k0 = db ? (phase == 1 ? ['p1', 'd1'] : ['d1', 'd2', 'd3']) : (phase == 1 ? ['p1'] : ['p2']);
+  const perWeek = {2: 1, 3: 2, 4: 2, 5: 2, 6: 2};
+  // A -> B -> C keeps rotating across weeks
+  var kc = k0.length == 3 ? week * perWeek[p.days]! : 0;
   const pats = {
     2: ['K', 'p3'], 3: ['K', 'p3', 'K'], 4: ['K', 'p3', 'K', 'walk'],
     5: ['K', 'p3', 'walk', 'K', 'p3'], 6: ['K', 'p3', 'walk', 'K', 'p3', 'walk'],
   };
   const dayIdx = {2: [0, 3], 3: [0, 2, 4], 4: [0, 1, 3, 5], 5: [0, 1, 2, 4, 5], 6: [0, 1, 2, 3, 4, 5]};
-  final pat = pats[p.days]!.map((x) => x == 'K' ? k0[(kc++) % 2] : x).toList();
+  final pat = pats[p.days]!.map((x) => x == 'K' ? k0[(kc++) % k0.length] : x).toList();
   final out = List<String?>.filled(7, null);
   final days = dayIdx[p.days]!;
   for (var i = 0; i < days.length; i++) {
@@ -727,9 +970,11 @@ class Rec {
 // ---------- what was actually trained ----------
 final cardioActs = cardioActsList.toSet();
 
+const _oldNames = {'Dumbbell A · Seluruh Tubuh': 'd1', 'Dumbbell B · Seluruh Tubuh': 'd2'};
+
 Program? programByName(String name) {
   for (final p in programs) {
-    if (p.name == name) return p;
+    if (p.name == name || p.id == _oldNames[name]) return p;
   }
   return null;
 }
@@ -856,10 +1101,19 @@ Rec recommendToday(AppData s, {List<int> steps7 = const []}) {
           ((p.equip == 'db') ? (phase == 1 ? (pr.id == 'p1' || pr.id == 'd1') : pr.db) : (phase == 1 ? pr.id == 'p1' : (pr.id == 'p2' || pr.id == 'p1'))))
         pr,
   ];
+  // next dumbbell day in the A -> B -> C rotation gets priority
+  String? nextDb;
+  for (final m in s.moves.reversed) {
+    final pr = programByName(m.name);
+    if (pr != null && pr.db) {
+      nextDb = const {'d1': 'd2', 'd2': 'd3', 'd3': 'd1'}[pr.id];
+      break;
+    }
+  }
   Program? bestStr;
   var bestScore = -1e9;
   for (final pr in cands) {
-    var sc = 0.0;
+    var sc = pr.id == (nextDb ?? 'd1') ? 2.0 : 0.0;
     pr.musclesAt(lvl).forEach((k, v) {
       final deficit = math.max(0.0, 10 - (an.sets[k] ?? 0)) / 10;
       sc += v * deficit;
@@ -1004,11 +1258,11 @@ const weighDont = [
 
 /// Re-projects the plan from the latest weigh-in, so the roadmap follows the
 /// real weight instead of the original guess.
-List<Wk> simulateFrom(Profile p, Weight w, [String? pace]) {
+List<Wk> simulateFrom(Profile p, Weight w, [String? pace, double adh = 1]) {
   final q = Profile.from(p.toJson());
   q.pKg = w.kg;
   q.pStart = DateTime.parse('${w.d}T00:00:00').millisecondsSinceEpoch;
-  return simulate(pace ?? p.pace, q);
+  return simulate(pace ?? p.pace, q, adh: adh);
 }
 
 // ---------- how real fasts compare with the target ----------

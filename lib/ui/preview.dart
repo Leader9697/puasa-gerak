@@ -8,26 +8,35 @@ import 'player.dart';
 
 /// Shows every movement of a session (with animation, sets, muscles) before
 /// the timer starts.
-class ProgramPreview extends StatelessWidget {
+class ProgramPreview extends StatefulWidget {
   final Program program;
   final int lvl;
   const ProgramPreview({super.key, required this.program, required this.lvl});
+  @override
+  State<ProgramPreview> createState() => _ProgramPreviewState();
+}
+
+class _ProgramPreviewState extends State<ProgramPreview> {
+  bool lite = false;
+  Program get program => widget.program;
+  int get lvl => widget.lvl;
 
   @override
   Widget build(BuildContext context) {
     final s = AppScope.of(context);
     final pal = Pal.of(context);
     final col = C.progColors[program.color];
-    final seq = program.seq(lvl);
+    final seq = program.seq(lvl, lite);
     final warm = seq.where((x) => x.type == 'warm').toList();
     final cool = seq.where((x) => x.type == 'cool').toList();
     // main part: one entry per exercise, in order of first appearance
-    final work = <String, ({int n, int sec, String base})>{};
-    for (final st in seq.where((x) => x.type == 'work')) {
+    final work = <String, ({int n, WStep st})>{};
+    for (final st in seq.where((x) => x.counts)) {
       final w = work[st.ex];
-      work[st.ex] = (n: (w?.n ?? 0) + 1, sec: st.sec, base: st.root);
+      work[st.ex] = (n: (w?.n ?? 0) + 1, st: st);
     }
-    final ups = work.values.where((w) => rungIdx(w.base, lvl) > 0).length;
+    final plates = program.db ? platePlan(seq, s.d) : <PlateStep>[];
+    final ups = lite ? 0 : work.values.where((w) => rungIdx(w.st.root, lvl) > 0).length;
     final rests = seq.where((x) => x.type == 'rest' && !x.swap).map((x) => x.sec).toList();
     final swaps = seq.where((x) => x.swap).toList();
     final restSec = rests.isEmpty ? 0 : rests.reduce((a, b) => a < b ? a : b);
@@ -56,7 +65,7 @@ class ProgramPreview extends StatelessWidget {
           Text('Tingkat ${i + 1} dari ${l.length}${down > 0 ? ' · kamu pilih lebih mudah' : ''}',
               style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w700)),
           if (down == 0 && next != null) Muted(next, size: 12),
-          Wrap(spacing: 14, children: [
+          if (!lite) Wrap(spacing: 14, children: [
             if (i > 0)
               GestureDetector(onTap: () => s.stepDown(base), child: Padding(padding: const EdgeInsets.symmetric(vertical: 6), child: Text('Pakai versi lebih mudah', style: link))),
             if (down > 0)
@@ -86,11 +95,18 @@ class ProgramPreview extends StatelessWidget {
               if (prim.isNotEmpty) Muted('Otot: ${muscleList(prim)}', size: 12.5),
               const SizedBox(height: 2),
               Text(e.how, style: const TextStyle(fontSize: 13, height: 1.35)),
-              if (base != null && ladders.containsKey(base)) ladderInfo(base),
+              if (base != null && ladders.containsKey(base) && !lite) ladderInfo(base),
             ]),
           ),
         ]),
       );
+    }
+
+    String amount(WStep st) {
+      final e = ex[st.ex]!;
+      if (st.reps == null) return '${st.sec} dtk';
+      if (st.side != null) return '${st.reps} repetisi per sisi';
+      return '${st.reps} repetisi${e.alt ? ' (kanan-kiri)' : ''}';
     }
 
     String dur(int sec) => sec % 60 == 0 ? '${sec ~/ 60} mnt' : '$sec dtk';
@@ -118,6 +134,22 @@ class ProgramPreview extends StatelessWidget {
                       if (mus.isNotEmpty) Text('Melatih: ${muscleList(mus.map((e) => e.key))}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13.5)),
                     ], gap: 8),
                   ),
+                  if (program.kind == 'str' || program.kind == 'prog')
+                    Box(
+                      child: Row(children: [
+                        Expanded(
+                          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            const Text('Lagi malas atau capek?', style: TextStyle(fontWeight: FontWeight.w700, fontSize: 15)),
+                            Muted(
+                                lite
+                                    ? 'Mode ringan aktif: set atau putaran dikurangi dan tiap gerakan satu tingkat lebih mudah. Tetap tercatat. Latihan ringan yang jadi lebih baik daripada latihan berat yang batal.'
+                                    : 'Pakai mode ringan: lebih sedikit set dan gerakan lebih mudah. Latihan yang terasa enak membuat kita lebih mungkin mengulanginya.',
+                                size: 12.5),
+                          ]),
+                        ),
+                        Switch(value: lite, activeThumbColor: col, onChanged: (v) => setState(() => lite = v)),
+                      ]),
+                    ),
                   if (warm.isNotEmpty) ...[
                     section('Pemanasan', dur(warm.fold(0, (a, x) => a + x.sec))),
                     for (final w in warm) row(w.ex, dur(w.sec)),
@@ -129,7 +161,26 @@ class ProgramPreview extends StatelessWidget {
                     Muted('Sebelum ganti gerakan ada jeda ${swaps.last.sec} dtk untuk mengatur beban dumbbell. Tekan "+15 dtk" kalau butuh lebih lama, atau "Siap" kalau sudah.', size: 12.5),
                   if (ups > 0)
                     Muted('$ups gerakan sudah naik tingkat sesuai level dan berat badanmu. Kalau terlalu berat, pilih versi lebih mudah di gerakan itu.', size: 12.5),
-                  for (final w in work.entries) row(w.key, circuit ? '${w.value.sec} dtk tiap putaran' : '${w.value.n} set × ${w.value.sec} dtk', w.value.base),
+                  if (work.values.any((w) => w.st.reps != null))
+                    Muted('Set dihitung dengan repetisi, tanpa batas waktu. Tekan "Set selesai" setelah repetisi terakhir; waktu istirahat berjalan sendiri.', size: 12.5),
+                  for (final w in work.entries) row(w.key, '${circuit ? '' : '${w.value.n} set × '}${amount(w.value.st)}${circuit ? ' tiap putaran' : ''}', w.value.st.root),
+                  if (plates.isNotEmpty) ...[
+                    section('Urutan beban', 'tiap dumbbell'),
+                    Box(
+                      child: Col([
+                        Muted('Gerakan diurutkan dari beban berat ke ringan, jadi kebanyakan cukup melepas pelat.', size: 12.5),
+                        for (final x in plates)
+                          Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                            SizedBox(width: 62, child: Text('${fmtKg(x.kg)} kg', style: const TextStyle(fontWeight: FontWeight.w800, fontFeatures: tnum))),
+                            Expanded(
+                                child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              Text(ex[x.id]!.name, style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13.5)),
+                              Muted('${plateTxt(x.side)} · ${x.change}', size: 12.5),
+                            ])),
+                          ]),
+                      ], gap: 8),
+                    ),
+                  ],
                   if (cool.isNotEmpty) ...[
                     section('Pendinginan', dur(cool.fold(0, (a, x) => a + x.sec))),
                     for (final w in cool) row(w.ex, dur(w.sec)),
@@ -146,7 +197,7 @@ class ProgramPreview extends StatelessWidget {
                 width: double.infinity,
                 child: Btn('Mulai latihan', color: col, onTap: () {
                   Navigator.of(context).pushReplacement(
-                      MaterialPageRoute(builder: (_) => PlayerScreen(program: program, lvl: lvl), fullscreenDialog: true));
+                      MaterialPageRoute(builder: (_) => PlayerScreen(program: program, lvl: lvl, lite: lite), fullscreenDialog: true));
                 }),
               ),
             ),
