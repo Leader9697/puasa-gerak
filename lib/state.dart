@@ -42,15 +42,13 @@ class AppState extends ChangeNotifier {
 
   Future<void> init() async {
     d = await Store.load();
-    if (applyPending(d, await NativeBridge.takePending())) {
-      d.updatedAt = nowMs();
-      await Store.save(d);
-    }
     stepsBest = await Store.getInt('stepsBest', 0);
     loaded = true;
     notifyListeners();
     unawaited(Notifier.sync(d));
-    unawaited(NativeBridge.sync(d));
+    // Not awaited: platform calls never finish inside widget tests. Android
+    // ignores the app's sync while widget taps are still waiting here.
+    unawaited(applyWidgetTaps());
     if (p.steps) unawaited(refreshSteps());
     if (Cloud.user != null) unawaited(syncNow());
   }
@@ -69,7 +67,8 @@ class AppState extends ChangeNotifier {
 
   /// Picks up fasts started or ended from the home screen widget.
   Future<void> applyWidgetTaps() async {
-    if (applyPending(d, await NativeBridge.takePending())) {
+    final taps = await NativeBridge.takePending();
+    if (applyPending(d, taps)) {
       save();
     } else {
       unawaited(NativeBridge.sync(d));
