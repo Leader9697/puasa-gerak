@@ -74,4 +74,6 @@ dependencies {
     // Nothing OS style widget
     implementation("androidx.glance:glance-appwidget:1.1.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
+    // Newer WorkManager (used by Glance) ships correct R8 rules for its database.
+    implementation("androidx.work:work-runtime:2.10.1")
 }

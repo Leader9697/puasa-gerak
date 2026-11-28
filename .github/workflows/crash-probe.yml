@@ -53,3 +53,4 @@ jobs:
             echo "===== CRASH BUFFER ====="; cat crash.txt
             echo "===== APP LOG ====="; cat app.txt
             adb shell pidof com.faris.puasa_gerak && echo "APP ALIVE" || echo "APP DEAD"
+            if grep -q "FATAL EXCEPTION" crash.txt; then echo "App crashed"; exit 1; fi
