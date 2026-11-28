@@ -37,6 +37,40 @@ object FastState {
         )
     }
 
+    /**
+     * Start or end a fast from the home screen widget while the app is closed. The change is shown at once
+     * and queued; the app applies the queue to its own data the next time it opens (see [takePending]).
+     */
+    @Synchronized
+    fun toggleFromWidget(c: Context) {
+        val s = load(c)
+        val now = System.currentTimeMillis()
+        val p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val queue = p.getString("pending", "") ?: ""
+        if (s.mode == "fast") {
+            // Same rule as the app: a fast keeps the streak at >= 80% of target and never under 13 hours.
+            val hours = (now - s.start).toDouble() / HOUR
+            val kept = hours >= s.target * 0.95 || hours >= maxOf(13.0, s.target * 0.8)
+            save(c, "eat", s.start, s.target, now, s.plan, if (kept) s.streak + 1 else 0, s.notify)
+            p.edit().putString("pending", "${queue}e:$now;").apply()
+        } else {
+            save(c, "fast", now, s.plan, s.lastEnd, s.plan, s.streak, s.notify)
+            p.edit().putString("pending", "${queue}s:$now;").apply()
+        }
+    }
+
+    fun hasPending(c: Context): Boolean =
+        !(c.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString("pending", "") ?: "").isEmpty()
+
+    /** Returns and clears the widget taps the app has not seen yet, e.g. "s:1732800000000;e:1732857600000;". */
+    @Synchronized
+    fun takePending(c: Context): String {
+        val p = c.getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+        val q = p.getString("pending", "") ?: ""
+        p.edit().remove("pending").apply()
+        return q
+    }
+
     fun hm(t: Long): String {
         val c = Calendar.getInstance().apply { timeInMillis = t }
         return String.format("%02d.%02d", c.get(Calendar.HOUR_OF_DAY), c.get(Calendar.MINUTE))
@@ -50,6 +84,7 @@ object FastState {
         } catch (_: Exception) {
         }
         FastWidget.updateAll(c)
+        NothingWidgets.refresh(c)
         scheduleRefresh(c, s)
     }
 

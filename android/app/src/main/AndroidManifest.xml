@@ -67,6 +67,30 @@
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/fast_widget_info"/>
         </receiver>
 
+        <!-- Nothing OS style widgets (Jetpack Glance), 4x2 and 2x2 -->
+        <receiver android:name=".NothingWideReceiver" android:exported="false" android:label="Puasa · Nothing 4x2">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/nothing_widget_wide"/>
+        </receiver>
+        <receiver android:name=".NothingSmallReceiver" android:exported="false" android:label="Puasa · Nothing 2x2">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE"/>
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/nothing_widget_small"/>
+        </receiver>
+        <!-- Long press on the widget -> "Widget settings" (Android 12+) opens the fasting schedule -->
+        <activity
+            android:name=".NothingWidgetSettings"
+            android:exported="true"
+            android:excludeFromRecents="true"
+            android:theme="@android:style/Theme.Translucent.NoTitleBar">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_CONFIGURE"/>
+            </intent-filter>
+        </activity>
+
         <!-- Scheduled notifications -->
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationReceiver" />
         <receiver android:exported="false" android:name="com.dexterous.flutterlocalnotifications.ScheduledNotificationBootReceiver">

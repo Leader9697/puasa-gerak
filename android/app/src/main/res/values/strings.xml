@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="widget_desc">Stopwatch puasa dan jendela makan</string>
+    <string name="nothing_widget_desc">Puasa gaya Nothing: hitung mundur dot-matrix dan ring titik. Ketuk untuk mulai/akhiri puasa.</string>
 </resources>

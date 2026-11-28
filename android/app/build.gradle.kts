@@ -1,5 +1,6 @@
 plugins {
     id("com.android.application")
+    id("org.jetbrains.kotlin.plugin.compose")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
@@ -43,6 +44,11 @@ android {
         }
     }
 
+    // Jetpack Glance (home screen widget) is written with Compose.
+    buildFeatures {
+        compose = true
+    }
+
     buildTypes {
         release {
             signingConfig = signingConfigs.getByName("personal")
@@ -65,4 +71,7 @@ flutter {
 
 dependencies {
     coreLibraryDesugaring("com.android.tools:desugar_jdk_libs:2.1.5")
+    // Nothing OS style widget
+    implementation("androidx.glance:glance-appwidget:1.1.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
 }

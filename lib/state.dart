@@ -46,7 +46,9 @@ class AppState extends ChangeNotifier {
     loaded = true;
     notifyListeners();
     unawaited(Notifier.sync(d));
-    unawaited(NativeBridge.sync(d));
+    // Not awaited: platform calls never finish inside widget tests. Android
+    // ignores the app's sync while widget taps are still waiting here.
+    unawaited(applyWidgetTaps());
     if (p.steps) unawaited(refreshSteps());
     if (Cloud.user != null) unawaited(syncNow());
   }
@@ -61,6 +63,16 @@ class AppState extends ChangeNotifier {
       _pushT = Timer(const Duration(seconds: 2), () => unawaited(_push()));
     }
     if (!quiet) notifyListeners();
+  }
+
+  /// Picks up fasts started or ended from the home screen widget.
+  Future<void> applyWidgetTaps() async {
+    final taps = await NativeBridge.takePending();
+    if (applyPending(d, taps)) {
+      save();
+    } else {
+      unawaited(NativeBridge.sync(d));
+    }
   }
 
   // ---- cloud ----

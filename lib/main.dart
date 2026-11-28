@@ -59,6 +59,13 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    NativeBridge.onOpenFast = () {
+      if (mounted) go(1);
+    };
+    NativeBridge.listen();
+    NativeBridge.takeOpen().then((open) {
+      if (open && mounted) go(1);
+    });
     Store.getInt('tab', -1).then((v) {
       if (!mounted) return;
       final s = AppScope.read(context);
@@ -82,8 +89,9 @@ class _HomeScreenState extends State<HomeScreen> with WidgetsBindingObserver {
     if (st == AppLifecycleState.resumed) {
       final s = AppScope.read(context);
       if (s.p.steps) s.refreshSteps();
-      NativeBridge.sync(s.d);
-      if (Cloud.user != null) s.syncNow();
+      s.applyWidgetTaps().then((_) {
+        if (Cloud.user != null) s.syncNow();
+      });
       setState(() {});
     }
   }
