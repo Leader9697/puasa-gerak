@@ -7,3 +7,11 @@
 
 # Glance creates the widget tap handler from its class name.
 -keep class * implements androidx.glance.appwidget.action.ActionCallback { <init>(); }
+
+# flutter_local_notifications stores scheduled reminders with Gson, which reads
+# generic type info at runtime. R8 strips it unless kept, and every scheduling
+# call then fails ("Failed to handle method call"), so no reminder shows.
+-keepattributes Signature, InnerClasses, EnclosingMethod, *Annotation*
+-keep class com.dexterous.** { *; }
+-keep class com.google.gson.reflect.TypeToken { *; }
+-keep class * extends com.google.gson.reflect.TypeToken
