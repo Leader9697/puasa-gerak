@@ -42,6 +42,10 @@ class AppState extends ChangeNotifier {
 
   Future<void> init() async {
     d = await Store.load();
+    if (applyPending(d, await NativeBridge.takePending())) {
+      d.updatedAt = nowMs();
+      await Store.save(d);
+    }
     stepsBest = await Store.getInt('stepsBest', 0);
     loaded = true;
     notifyListeners();
@@ -61,6 +65,15 @@ class AppState extends ChangeNotifier {
       _pushT = Timer(const Duration(seconds: 2), () => unawaited(_push()));
     }
     if (!quiet) notifyListeners();
+  }
+
+  /// Picks up fasts started or ended from the home screen widget.
+  Future<void> applyWidgetTaps() async {
+    if (applyPending(d, await NativeBridge.takePending())) {
+      save();
+    } else {
+      unawaited(NativeBridge.sync(d));
+    }
   }
 
   // ---- cloud ----
