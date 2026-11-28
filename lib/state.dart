@@ -129,7 +129,7 @@ class AppState extends ChangeNotifier {
       final m = e.toString();
       if (m.contains('canceled') || m.contains('cancelled')) return 'Login dibatalkan';
       if (m.contains('operation-not-allowed')) return 'Login Google belum diaktifkan di Firebase (Authentication → Google)';
-      return 'Login gagal. Cek koneksi internet lalu coba lagi.';
+      return 'Login gagal. Cek koneksi internet lalu coba lagi. (${m.length > 120 ? m.substring(0, 120) : m})';
     }
   }
 
